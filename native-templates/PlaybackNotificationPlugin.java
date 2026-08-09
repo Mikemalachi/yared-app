@@ -20,10 +20,12 @@ public class PlaybackNotificationPlugin extends Plugin implements PlaybackServic
     public void update(PluginCall call) {
         String title = call.getString("title", "Yared Hymn Tracker");
         boolean playing = Boolean.TRUE.equals(call.getBoolean("playing", false));
+        boolean modeActive = Boolean.TRUE.equals(call.getBoolean("modeActive", false));
         Intent intent = new Intent(getContext(), PlaybackService.class);
         intent.setAction(PlaybackService.ACTION_UPDATE);
         intent.putExtra(PlaybackService.EXTRA_TITLE, title);
         intent.putExtra(PlaybackService.EXTRA_PLAYING, playing);
+        intent.putExtra(PlaybackService.EXTRA_MODE_ACTIVE, modeActive);
         ContextCompat.startForegroundService(getContext(), intent);
         call.resolve();
     }
@@ -47,6 +49,10 @@ public class PlaybackNotificationPlugin extends Plugin implements PlaybackServic
             notifyListeners("next", data);
         } else if (PlaybackService.ACTION_PREV.equals(action)) {
             notifyListeners("previous", data);
+        } else if (PlaybackService.ACTION_MODE_NEXT.equals(action)) {
+            notifyListeners("modenext", data);
+        } else if (PlaybackService.ACTION_MODE_PREV.equals(action)) {
+            notifyListeners("modeprev", data);
         }
     }
 }

@@ -19,11 +19,14 @@ public class PlaybackService extends Service {
     public static final String ACTION_PAUSE = "com.yared.hymntracker.ACTION_PAUSE";
     public static final String ACTION_NEXT = "com.yared.hymntracker.ACTION_NEXT";
     public static final String ACTION_PREV = "com.yared.hymntracker.ACTION_PREV";
+    public static final String ACTION_MODE_NEXT = "com.yared.hymntracker.ACTION_MODE_NEXT";
+    public static final String ACTION_MODE_PREV = "com.yared.hymntracker.ACTION_MODE_PREV";
     public static final String ACTION_STOP = "com.yared.hymntracker.ACTION_STOP";
     public static final String ACTION_UPDATE = "com.yared.hymntracker.ACTION_UPDATE";
 
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_PLAYING = "playing";
+    public static final String EXTRA_MODE_ACTIVE = "modeActive";
 
     public interface ControlListener {
         void onControl(String action);
@@ -35,6 +38,7 @@ public class PlaybackService extends Service {
 
     private String currentTitle = "Yared Hymn Tracker";
     private boolean isPlaying = false;
+    private boolean modeActive = false;
 
     @Override
     public void onCreate() {
@@ -52,6 +56,9 @@ public class PlaybackService extends Service {
                 }
                 if (intent.hasExtra(EXTRA_PLAYING)) {
                     isPlaying = intent.getBooleanExtra(EXTRA_PLAYING, false);
+                }
+                if (intent.hasExtra(EXTRA_MODE_ACTIVE)) {
+                    modeActive = intent.getBooleanExtra(EXTRA_MODE_ACTIVE, false);
                 }
                 startForeground(NOTIF_ID, buildNotification());
             } else if (ACTION_STOP.equals(action)) {
@@ -96,13 +103,27 @@ public class PlaybackService extends Service {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle)
-            .setContentText("Yared Hymn Tracker")
+            .setContentText(modeActive ? "Yared Hymn Tracker — practice mode active" : "Yared Hymn Tracker")
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
-            .addAction(android.R.drawable.ic_media_previous, "Previous", actionIntent(ACTION_PREV))
-            .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", actionIntent(playPauseAction))
-            .addAction(android.R.drawable.ic_media_next, "Next", actionIntent(ACTION_NEXT))
             .setPriority(NotificationCompat.PRIORITY_LOW);
+
+        if (modeActive) {
+            // Five actions: outer pair skips the whole hymn, inner pair steps
+            // through whatever practice mode (AB repeat / Teacher / Continuous)
+            // is currently active — mirrors the in-app Next/Previous for that mode.
+            builder
+                .addAction(android.R.drawable.ic_media_previous, "Previous hymn", actionIntent(ACTION_PREV))
+                .addAction(android.R.drawable.ic_media_rew, "Previous segment", actionIntent(ACTION_MODE_PREV))
+                .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", actionIntent(playPauseAction))
+                .addAction(android.R.drawable.ic_media_ff, "Next segment", actionIntent(ACTION_MODE_NEXT))
+                .addAction(android.R.drawable.ic_media_next, "Next hymn", actionIntent(ACTION_NEXT));
+        } else {
+            builder
+                .addAction(android.R.drawable.ic_media_previous, "Previous", actionIntent(ACTION_PREV))
+                .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", actionIntent(playPauseAction))
+                .addAction(android.R.drawable.ic_media_next, "Next", actionIntent(ACTION_NEXT));
+        }
 
         return builder.build();
     }

@@ -2490,6 +2490,7 @@ document.getElementById('toggleAB').addEventListener('click', ()=>{
   ab.enabled = !ab.enabled;
   if(ab.enabled) stopPractice();
   updateAbButton();
+  nativeNotifyUpdate();
 });
 function handleAbLoop(){
   if(!ab.enabled || ab.a==null || ab.b==null) return;
@@ -2615,11 +2616,13 @@ function startPane(pane){
   practice.repDone=0; practice.cumulative=false; practice.waiting=false;
   seekAndPlay(practice.segStart);
   updatePracticeStatus();
+  nativeNotifyUpdate();
 }
 function stopPractice(){
   practice.active=false; practice.waiting=false; practice.pane=null;
   clearTimeout(practice.timer);
   updatePracticeStatus();
+  nativeNotifyUpdate();
 }
 function startFromBeginning(pane){
   if(!(practice.active && practice.pane===pane)){
@@ -2789,7 +2792,23 @@ function getNativeNotifPlugin(){
 function nativeNotifyUpdate(){
   const plugin = getNativeNotifPlugin();
   if(!plugin || !currentHymn) return;
-  plugin.update({title: currentHymn.title, playing: !audio.paused}).catch(()=>{});
+  plugin.update({title: currentHymn.title, playing: !audio.paused, modeActive: isPracticeModeActive()}).catch(()=>{});
+}
+/* Whether a practice mode (AB Repeat / Teacher / Continuous) is currently
+   controlling playback — used to decide whether the notification shows a
+   second "segment" Next/Previous pair alongside the normal hymn skip pair. */
+function isPracticeModeActive(){
+  return !!(ab.enabled || (practice && practice.active));
+}
+/* "Segment" next/previous — steps through whatever mode is currently
+   active, mirroring that mode's own in-app Next/Previous button. */
+function modeNext(){
+  if(ab.enabled){ document.getElementById('abNextBtn').click(); return; }
+  if(practice.active) nextSegment(practice.pane);
+}
+function modePrev(){
+  if(ab.enabled){ document.getElementById('abPrevBtn').click(); return; }
+  if(practice.active) prevSegment(practice.pane);
 }
 function setupNativeNotificationBridge(){
   const plugin = getNativeNotifPlugin();
@@ -2798,6 +2817,8 @@ function setupNativeNotificationBridge(){
   plugin.addListener('pause', ()=>audio.pause());
   plugin.addListener('next', playNext);
   plugin.addListener('previous', playPrev);
+  plugin.addListener('modenext', modeNext);
+  plugin.addListener('modeprev', modePrev);
 }
 
 /* ============================================================
