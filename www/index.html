@@ -607,7 +607,19 @@
           <button class="btn secondary block" id="contPrevBtn" style="flex:1;">‹ Previous</button>
           <button class="btn secondary block" id="contNextBtn" style="flex:1;">Next ›</button>
         </div>
-        <button class="btn secondary block" id="contFromStartBtn">Start from beginning</button>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin-bottom:8px;">
+          <input type="checkbox" id="contReviewEnabled" style="width:auto; margin:0;"> Review from a set beginning periodically
+        </label>
+        <div class="field-inline">
+          <label>Every this many segments</label>
+          <div class="num-stepper">
+            <button data-target="contReviewEveryN" data-d="-1">–</button>
+            <input type="number" id="contReviewEveryN" value="3" min="1">
+            <button data-target="contReviewEveryN" data-d="1">+</button>
+          </div>
+        </div>
+        <button class="btn secondary block" id="contSetBeginningBtn">Set beginning <span id="contBeginningVal"></span></button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Press this at the point you want "beginning" to mean — it isn't assumed to be 0:00.</div>
       </div>
     </section>
 
@@ -890,19 +902,25 @@ let editingHymnId = null;
 let ab = {a:null, b:null, enabled:false};
 
 // Teacher / Continuous share one practice engine. Only one can run at a time.
-// segStart/segLength define the current segment; in 'cumulative' mode (Start
-// from beginning) the active range is always 0 -> cumulativeEnd instead.
+// segStart/segLength define the current segment; in 'cumulative' mode the
+// active range is cumulativeStart -> cumulativeEnd instead (used by Teacher's
+// manual "Start from beginning" AND Continuous's periodic beginning-review,
+// which are otherwise independent features sharing the same bounds fields).
 let practice = {
   active:false, pane:null,            // pane: 'teacher' | 'continuous'
   subMode:'default',                  // 'default' (plain duration) | 'ab' (A/B points)
   segStart:0, segLength:0, extraSecs:0,
   repeatCount:1, repDone:0,
-  cumulative:false, cumulativeEnd:0,
+  cumulative:false, cumulativeStart:0, cumulativeEnd:0,
+  reviewOneShot:false,                // true while playing a single periodic beginning-review pass
   waiting:false, timer:null
 };
 let teacherAB = {a:null, b:null};
 let contAB = {a:null, b:null};
 let teacherSubMode='default', contSubMode='default';
+// Continuous Mode's periodic "review from a set beginning" feature.
+let contBeginningPoint = null;
+let contSegmentsSinceReview = 0;
 
 const audio = document.getElementById('audioEl');
 const toastEl = document.getElementById('toast');
@@ -2166,6 +2184,8 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
   ab.a=null; ab.b=null; updateAbLabels();
   teacherAB={a:null,b:null}; contAB={a:null,b:null};
   updateAbFieldDisplay('teacher'); updateAbFieldDisplay('continuous');
+  contBeginningPoint=null; contSegmentsSinceReview=0;
+  document.getElementById('contBeginningVal').textContent='';
 
   currentHymn = h;
   currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
@@ -2644,7 +2664,7 @@ const paneCfg = {
     duration:'contDuration', extra:'contExtraSecs',
     setA:'contSetA', setB:'contSetB', aVal:'contAVal', bVal:'contBVal',
     start:'startContinuous', stop:'stopContinuous',
-    prev:'contPrevBtn', next:'contNextBtn', fromStart:'contFromStartBtn',
+    prev:'contPrevBtn', next:'contNextBtn',
     repeats:'contRepeats'
   }
 };
@@ -2689,21 +2709,25 @@ function readPaneConfig(pane){
 }
 function seekAndPlay(t){ audio.currentTime = Math.max(0,t); audio.play(); }
 function getBounds(){
-  if(practice.cumulative) return {start:0, end:practice.cumulativeEnd};
+  if(practice.cumulative) return {start:practice.cumulativeStart, end:practice.cumulativeEnd};
   return {start:practice.segStart, end:practice.segStart+practice.segLength};
 }
 function getPauseMs(){
-  const len = practice.cumulative ? practice.cumulativeEnd : practice.segLength;
+  const len = practice.cumulative ? Math.max(0, practice.cumulativeEnd-practice.cumulativeStart) : practice.segLength;
   return Math.max(0,(len+practice.extraSecs))*1000;
 }
 function startPane(pane){
   const conf = readPaneConfig(pane);
   if(!conf) return;
+  if(pane==='continuous' && contReviewEnabled() && contBeginningPoint==null){
+    toast('Set a beginning point first'); return;
+  }
   clearTimeout(practice.timer);
   practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
   practice.segStart=conf.segStart; practice.segLength=conf.segLength;
   practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
-  practice.repDone=0; practice.cumulative=false; practice.waiting=false;
+  practice.repDone=0; practice.cumulative=false; practice.reviewOneShot=false; practice.waiting=false;
+  contSegmentsSinceReview=0;
   seekAndPlay(practice.segStart);
   updatePracticeStatus();
   nativeNotifyUpdate();
@@ -2724,6 +2748,7 @@ function startFromBeginning(pane){
   }
   clearTimeout(practice.timer);
   practice.cumulative=true;
+  practice.cumulativeStart=0;
   practice.cumulativeEnd = practice.segStart+practice.segLength;
   practice.repDone=0; practice.waiting=false;
   seekAndPlay(0);
@@ -2734,7 +2759,7 @@ function nextSegment(pane){
   clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
   if(practice.cumulative){
     practice.cumulativeEnd += practice.segLength;
-    seekAndPlay(0);
+    seekAndPlay(practice.cumulativeStart);
   } else {
     practice.segStart += practice.segLength;
     if(practice.subMode==='ab'){
@@ -2745,13 +2770,14 @@ function nextSegment(pane){
     seekAndPlay(practice.segStart);
   }
   updatePracticeStatus();
+  nativeNotifyUpdate();
 }
 function prevSegment(pane){
   if(!(practice.active && practice.pane===pane)){ toast('Press Start first'); return; }
   clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
   if(practice.cumulative){
-    practice.cumulativeEnd = Math.max(practice.segLength, practice.cumulativeEnd-practice.segLength);
-    seekAndPlay(0);
+    practice.cumulativeEnd = Math.max(practice.cumulativeStart+practice.segLength, practice.cumulativeEnd-practice.segLength);
+    seekAndPlay(practice.cumulativeStart);
   } else {
     practice.segStart = Math.max(0, practice.segStart-practice.segLength);
     if(practice.subMode==='ab'){
@@ -2762,40 +2788,67 @@ function prevSegment(pane){
     seekAndPlay(practice.segStart);
   }
   updatePracticeStatus();
+  nativeNotifyUpdate();
 }
+function contReviewEnabled(){ return document.getElementById('contReviewEnabled').checked; }
+function getContReviewEveryN(){ return parseInt(document.getElementById('contReviewEveryN').value)||1; }
 function finishContinuous(){
   markPracticed(currentHymn.id);
   stopPractice();
   toast('Continuous mode complete');
 }
+/* Called once a segment's repeats are exhausted. For Continuous Mode, first
+   checks whether it's time for a periodic "review from the set beginning"
+   pass; if so, plays that single pass before actually moving to the next
+   segment (handled by advanceSegmentReal, invoked once the review finishes). */
 function advanceSegmentAuto(){
-  if(practice.cumulative){
-    practice.cumulativeEnd += practice.segLength;
-    if(practice.cumulativeEnd > audio.duration+0.25){ finishContinuous(); return; }
-    seekAndPlay(0);
-  } else {
-    practice.segStart += practice.segLength;
-    if(practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
-    if(practice.subMode==='ab'){
-      const store = abStoreFor(practice.pane);
-      store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
-      updateAbFieldDisplay(practice.pane);
+  if(practice.pane==='continuous' && contReviewEnabled() && contBeginningPoint!=null){
+    contSegmentsSinceReview++;
+    if(contSegmentsSinceReview >= getContReviewEveryN()){
+      contSegmentsSinceReview = 0;
+      practice.cumulative = true;
+      practice.cumulativeStart = contBeginningPoint;
+      practice.cumulativeEnd = practice.segStart + practice.segLength;
+      practice.reviewOneShot = true;
+      practice.repDone = 0;
+      seekAndPlay(practice.cumulativeStart);
+      updatePracticeStatus();
+      nativeNotifyUpdate();
+      return;
     }
-    seekAndPlay(practice.segStart);
   }
+  advanceSegmentReal();
+}
+function advanceSegmentReal(){
+  practice.cumulative = false;
+  practice.segStart += practice.segLength;
+  if(practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
+  if(practice.subMode==='ab'){
+    const store = abStoreFor(practice.pane);
+    store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+    updateAbFieldDisplay(practice.pane);
+  }
+  seekAndPlay(practice.segStart);
+  nativeNotifyUpdate();
 }
 function practiceAfterPause(){
   practice.waiting=false;
+  if(practice.reviewOneShot){
+    practice.reviewOneShot=false;
+    advanceSegmentReal();
+    updatePracticeStatus();
+    return;
+  }
   if(practice.pane==='continuous'){
     practice.repDone++;
     if(practice.repDone < practice.repeatCount){
-      seekAndPlay(practice.cumulative?0:practice.segStart);
+      seekAndPlay(practice.segStart);
     } else {
       practice.repDone=0;
       advanceSegmentAuto();
     }
   } else {
-    seekAndPlay(practice.cumulative?0:practice.segStart);
+    seekAndPlay(practice.cumulative?practice.cumulativeStart:practice.segStart);
   }
   updatePracticeStatus();
 }
@@ -2815,9 +2868,9 @@ function updatePracticeStatus(){
   el.classList.add('active');
   const label = practice.pane==='teacher' ? 'Teacher mode' : 'Continuous mode';
   const range = practice.cumulative
-    ? `0:00–${fmtTime(practice.cumulativeEnd)} (from the beginning)`
+    ? `${fmtTime(practice.cumulativeStart)}–${fmtTime(practice.cumulativeEnd)} (review)`
     : `${fmtTime(practice.segStart)}–${fmtTime(practice.segStart+practice.segLength)}`;
-  const repInfo = (practice.pane==='continuous' && isFinite(practice.repeatCount))
+  const repInfo = (practice.pane==='continuous' && !practice.cumulative && isFinite(practice.repeatCount))
     ? ` · repeat ${Math.min(practice.repDone+1, practice.repeatCount)}/${practice.repeatCount}` : '';
   el.textContent = `${label} — ${range}${repInfo}${practice.waiting?' (paused)':''}`;
 }
@@ -2831,7 +2884,10 @@ document.getElementById('startContinuous').addEventListener('click', ()=>startPa
 document.getElementById('stopContinuous').addEventListener('click', stopPractice);
 document.getElementById('contNextBtn').addEventListener('click', ()=>nextSegment('continuous'));
 document.getElementById('contPrevBtn').addEventListener('click', ()=>prevSegment('continuous'));
-document.getElementById('contFromStartBtn').addEventListener('click', ()=>startFromBeginning('continuous'));
+document.getElementById('contSetBeginningBtn').addEventListener('click', ()=>{
+  contBeginningPoint = audio.currentTime;
+  document.getElementById('contBeginningVal').textContent = fmtTime(contBeginningPoint);
+});
 
 /* ============================================================
    SUBTABS (AB / Teacher / Continuous panels)
@@ -2882,7 +2938,29 @@ function getNativeNotifPlugin(){
 function nativeNotifyUpdate(){
   const plugin = getNativeNotifPlugin();
   if(!plugin || !currentHymn) return;
-  plugin.update({title: currentHymn.title, playing: !audio.paused, modeActive: isPracticeModeActive()}).catch(()=>{});
+  plugin.update({
+    title: currentHymn.title,
+    playing: !audio.paused,
+    modeActive: isPracticeModeActive(),
+    statusText: getNotificationStatusText()
+  }).catch(()=>{});
+}
+/* Short status line for the notification body: playing/paused state plus
+   whatever segment is currently active (AB range, or the current Teacher/
+   Continuous segment), instead of a generic "practice mode active" label. */
+function getNotificationStatusText(){
+  const state = audio.paused ? 'Paused' : 'Playing';
+  if(ab.enabled && ab.a!=null && ab.b!=null){
+    return `${state} — AB ${fmtTime(ab.a)}–${fmtTime(ab.b)}`;
+  }
+  if(practice.active){
+    const label = practice.pane==='teacher' ? 'Teacher' : 'Continuous';
+    const range = practice.cumulative
+      ? `${fmtTime(practice.cumulativeStart)}–${fmtTime(practice.cumulativeEnd)} review`
+      : `${fmtTime(practice.segStart)}–${fmtTime(practice.segStart+practice.segLength)}`;
+    return `${state} — ${label} ${range}`;
+  }
+  return state;
 }
 /* Whether a practice mode (AB Repeat / Teacher / Continuous) is currently
    controlling playback — used to decide whether the notification shows a

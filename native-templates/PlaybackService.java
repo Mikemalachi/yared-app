@@ -28,6 +28,7 @@ public class PlaybackService extends Service {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_PLAYING = "playing";
     public static final String EXTRA_MODE_ACTIVE = "modeActive";
+    public static final String EXTRA_STATUS_TEXT = "statusText";
 
     public interface ControlListener {
         void onControl(String action);
@@ -38,6 +39,7 @@ public class PlaybackService extends Service {
     }
 
     private String currentTitle = "Yared Hymn Tracker";
+    private String statusText = "";
     private boolean isPlaying = false;
     private boolean modeActive = false;
 
@@ -60,6 +62,9 @@ public class PlaybackService extends Service {
                 }
                 if (intent.hasExtra(EXTRA_MODE_ACTIVE)) {
                     modeActive = intent.getBooleanExtra(EXTRA_MODE_ACTIVE, false);
+                }
+                if (intent.hasExtra(EXTRA_STATUS_TEXT)) {
+                    statusText = intent.getStringExtra(EXTRA_STATUS_TEXT);
                 }
                 startForeground(NOTIF_ID, buildNotification());
             } else if (ACTION_STOP.equals(action)) {
@@ -97,14 +102,26 @@ public class PlaybackService extends Service {
         return PendingIntent.getService(this, action.hashCode(), intent, flags);
     }
 
+    private PendingIntent contentIntent() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return PendingIntent.getActivity(this, 0, intent, flags);
+    }
+
     private Notification buildNotification() {
         int playPauseIcon = isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play;
         String playPauseAction = isPlaying ? ACTION_PAUSE : ACTION_PLAY;
+        String displayText = (statusText == null || statusText.isEmpty()) ? "Yared Hymn Tracker" : statusText;
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(currentTitle)
-            .setContentText(modeActive ? "Yared Hymn Tracker — practice mode active" : "Yared Hymn Tracker")
+            .setContentText(displayText)
+            .setContentIntent(contentIntent())
             .setOnlyAlertOnce(true)
             .setOngoing(isPlaying)
             .setPriority(NotificationCompat.PRIORITY_LOW);
