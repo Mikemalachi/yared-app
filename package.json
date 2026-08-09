@@ -5,7 +5,8 @@
   "description": "Yared Hymn Tracker - Capacitor Android wrapper",
   "dependencies": {
     "@capacitor/core": "^8.0.0",
-    "@capacitor/android": "^8.0.0"
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",

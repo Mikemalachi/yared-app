@@ -20,19 +20,40 @@
     --radius:14px;
   }
   body.dark{
-    --parchment:#1C1712;
-    --parchment-dim:#2A2219;
-    --ink:#EFE6D6;
-    --ink-soft:#B8A98C;
-    --gold:#D9A741;
-    --gold-bright:#E8BE6B;
-    --maroon:#B5504F;
-    --sage:#7C9A78;
-    --line:#3C3226;
-    --surface:#252019;
-    --shadow:0 4px 14px rgba(0,0,0,0.35);
+    --parchment:#0A0E1C;
+    --parchment-dim:#131B33;
+    --ink:#E8ECF7;
+    --ink-soft:#8B93B8;
+    --gold:#E8BE6B;
+    --gold-bright:#F2CE7C;
+    --maroon:#B5567E;
+    --sage:#6FA8A0;
+    --line:#242E4E;
+    --surface:#101830;
+    --shadow:0 4px 18px rgba(0,0,0,0.5);
   }
   body.dark .lyric-frame{background:#fff;}
+  body.dark{
+    background-image:
+      radial-gradient(1.6px 1.6px at 12% 8%, rgba(255,255,255,0.9), transparent),
+      radial-gradient(1px 1px at 28% 22%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1.4px 1.4px at 46% 6%, rgba(255,255,255,0.75), transparent),
+      radial-gradient(1px 1px at 63% 18%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1.8px 1.8px at 80% 10%, rgba(255,255,255,0.85), transparent),
+      radial-gradient(1px 1px at 92% 26%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.3px 1.3px at 8% 42%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 35% 52%, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1.6px 1.6px at 55% 46%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 72% 58%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.4px 1.4px at 88% 48%, rgba(255,255,255,0.65), transparent),
+      radial-gradient(1px 1px at 18% 72%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.2px 1.2px at 42% 82%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1px 1px at 65% 90%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1.5px 1.5px at 95% 80%, rgba(255,255,255,0.6), transparent);
+    background-repeat: repeat;
+    background-size: 340px 340px;
+    background-attachment: fixed;
+  }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
   body{
@@ -557,7 +578,21 @@
           <button class="btn secondary block" id="teacherPrevBtn" style="flex:1;">‹ Previous</button>
           <button class="btn secondary block" id="teacherNextBtn" style="flex:1;">Next ›</button>
         </div>
-        <button class="btn secondary block" id="teacherFromStartBtn">Start from beginning</button>
+        <button class="btn secondary block" id="teacherFromStartBtn">Start from beginning (once, now)</button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin:6px 0 12px;">— or trigger it automatically every so many phrase changes: —</div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin-bottom:8px;">
+          <input type="checkbox" id="teacherReviewEnabled" style="width:auto; margin:0;"> Review from a set beginning periodically
+        </label>
+        <div class="field-inline">
+          <label>Every this many phrase changes</label>
+          <div class="num-stepper">
+            <button data-target="teacherReviewEveryN" data-d="-1">–</button>
+            <input type="number" id="teacherReviewEveryN" value="3" min="1">
+            <button data-target="teacherReviewEveryN" data-d="1">+</button>
+          </div>
+        </div>
+        <button class="btn secondary block" id="teacherSetBeginningBtn">Set beginning <span id="teacherBeginningVal"></span></button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Defaults to 0:00 if you don't set one. When a review comes up, press Next once more to move past it into the new phrase.</div>
       </div>
 
       <div class="subpane" id="pane-continuous">
@@ -619,7 +654,7 @@
           </div>
         </div>
         <button class="btn secondary block" id="contSetBeginningBtn">Set beginning <span id="contBeginningVal"></span></button>
-        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Press this at the point you want "beginning" to mean — it isn't assumed to be 0:00.</div>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Defaults to 0:00 if you don't set one.</div>
       </div>
     </section>
 
@@ -912,15 +947,18 @@ let practice = {
   segStart:0, segLength:0, extraSecs:0,
   repeatCount:1, repDone:0,
   cumulative:false, cumulativeStart:0, cumulativeEnd:0,
-  reviewOneShot:false,                // true while playing a single periodic beginning-review pass
+  reviewPending:false,                // true while a periodic/manual beginning-review is in progress
   waiting:false, timer:null
 };
 let teacherAB = {a:null, b:null};
 let contAB = {a:null, b:null};
 let teacherSubMode='default', contSubMode='default';
-// Continuous Mode's periodic "review from a set beginning" feature.
+// Periodic "review from a set beginning" — Continuous triggers automatically
+// once a segment's repeats are exhausted; Teacher triggers on manual Next.
 let contBeginningPoint = null;
 let contSegmentsSinceReview = 0;
+let teacherBeginningPoint = null;
+let teacherSegmentsSinceReview = 0;
 
 const audio = document.getElementById('audioEl');
 const toastEl = document.getElementById('toast');
@@ -2185,7 +2223,9 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
   teacherAB={a:null,b:null}; contAB={a:null,b:null};
   updateAbFieldDisplay('teacher'); updateAbFieldDisplay('continuous');
   contBeginningPoint=null; contSegmentsSinceReview=0;
+  teacherBeginningPoint=null; teacherSegmentsSinceReview=0;
   document.getElementById('contBeginningVal').textContent='';
+  document.getElementById('teacherBeginningVal').textContent='';
 
   currentHymn = h;
   currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
@@ -2719,15 +2759,12 @@ function getPauseMs(){
 function startPane(pane){
   const conf = readPaneConfig(pane);
   if(!conf) return;
-  if(pane==='continuous' && contReviewEnabled() && contBeginningPoint==null){
-    toast('Set a beginning point first'); return;
-  }
   clearTimeout(practice.timer);
   practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
   practice.segStart=conf.segStart; practice.segLength=conf.segLength;
   practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
-  practice.repDone=0; practice.cumulative=false; practice.reviewOneShot=false; practice.waiting=false;
-  contSegmentsSinceReview=0;
+  practice.repDone=0; practice.cumulative=false; practice.reviewPending=false; practice.waiting=false;
+  contSegmentsSinceReview=0; teacherSegmentsSinceReview=0;
   seekAndPlay(practice.segStart);
   updatePracticeStatus();
   nativeNotifyUpdate();
@@ -2748,15 +2785,52 @@ function startFromBeginning(pane){
   }
   clearTimeout(practice.timer);
   practice.cumulative=true;
+  practice.reviewPending=false;
   practice.cumulativeStart=0;
   practice.cumulativeEnd = practice.segStart+practice.segLength;
   practice.repDone=0; practice.waiting=false;
   seekAndPlay(0);
   updatePracticeStatus();
+  nativeNotifyUpdate();
 }
+function contReviewEnabled(){ return document.getElementById('contReviewEnabled').checked; }
+function getContReviewEveryN(){ return parseInt(document.getElementById('contReviewEveryN').value)||1; }
+function teacherReviewEnabled(){ return document.getElementById('teacherReviewEnabled').checked; }
+function getTeacherReviewEveryN(){ return parseInt(document.getElementById('teacherReviewEveryN').value)||1; }
+
 function nextSegment(pane){
   if(!(practice.active && practice.pane===pane)){ toast('Press Start first'); return; }
   clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
+
+  // Exiting a periodic review that was just heard — move to the real next segment.
+  if(practice.cumulative && practice.reviewPending){
+    practice.cumulative=false; practice.reviewPending=false;
+    practice.segStart += practice.segLength;
+    if(practice.subMode==='ab'){
+      const store = abStoreFor(pane);
+      store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+      updateAbFieldDisplay(pane);
+    }
+    seekAndPlay(practice.segStart);
+    updatePracticeStatus(); nativeNotifyUpdate();
+    return;
+  }
+
+  // Teacher's periodic review trigger (Continuous's equivalent runs automatically
+  // once a segment's repeats are exhausted — see advanceSegmentAuto).
+  if(pane==='teacher' && teacherReviewEnabled()){
+    teacherSegmentsSinceReview++;
+    if(teacherSegmentsSinceReview >= getTeacherReviewEveryN()){
+      teacherSegmentsSinceReview = 0;
+      practice.cumulative=true; practice.reviewPending=true;
+      practice.cumulativeStart = teacherBeginningPoint!=null ? teacherBeginningPoint : 0;
+      practice.cumulativeEnd = practice.segStart + practice.segLength;
+      seekAndPlay(practice.cumulativeStart);
+      updatePracticeStatus(); nativeNotifyUpdate();
+      return;
+    }
+  }
+
   if(practice.cumulative){
     practice.cumulativeEnd += practice.segLength;
     seekAndPlay(practice.cumulativeStart);
@@ -2790,26 +2864,25 @@ function prevSegment(pane){
   updatePracticeStatus();
   nativeNotifyUpdate();
 }
-function contReviewEnabled(){ return document.getElementById('contReviewEnabled').checked; }
-function getContReviewEveryN(){ return parseInt(document.getElementById('contReviewEveryN').value)||1; }
 function finishContinuous(){
   markPracticed(currentHymn.id);
   stopPractice();
   toast('Continuous mode complete');
 }
-/* Called once a segment's repeats are exhausted. For Continuous Mode, first
-   checks whether it's time for a periodic "review from the set beginning"
-   pass; if so, plays that single pass before actually moving to the next
-   segment (handled by advanceSegmentReal, invoked once the review finishes). */
+/* Called once a segment's repeats are exhausted in Continuous Mode. Checks
+   whether a periodic beginning-review is due; if so, plays it — repeated the
+   SAME number of times as each segment repeats (practice.repeatCount), via
+   the normal repDone/repeatCount counting in practiceAfterPause — then moves
+   to the next segment for real once the review's repeats are done. */
 function advanceSegmentAuto(){
-  if(practice.pane==='continuous' && contReviewEnabled() && contBeginningPoint!=null){
+  if(practice.pane==='continuous' && contReviewEnabled()){
     contSegmentsSinceReview++;
     if(contSegmentsSinceReview >= getContReviewEveryN()){
       contSegmentsSinceReview = 0;
       practice.cumulative = true;
-      practice.cumulativeStart = contBeginningPoint;
+      practice.reviewPending = true;
+      practice.cumulativeStart = contBeginningPoint!=null ? contBeginningPoint : 0;
       practice.cumulativeEnd = practice.segStart + practice.segLength;
-      practice.reviewOneShot = true;
       practice.repDone = 0;
       seekAndPlay(practice.cumulativeStart);
       updatePracticeStatus();
@@ -2821,8 +2894,9 @@ function advanceSegmentAuto(){
 }
 function advanceSegmentReal(){
   practice.cumulative = false;
+  practice.reviewPending = false;
   practice.segStart += practice.segLength;
-  if(practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
+  if(practice.pane==='continuous' && practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
   if(practice.subMode==='ab'){
     const store = abStoreFor(practice.pane);
     store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
@@ -2833,19 +2907,17 @@ function advanceSegmentReal(){
 }
 function practiceAfterPause(){
   practice.waiting=false;
-  if(practice.reviewOneShot){
-    practice.reviewOneShot=false;
-    advanceSegmentReal();
-    updatePracticeStatus();
-    return;
-  }
   if(practice.pane==='continuous'){
     practice.repDone++;
     if(practice.repDone < practice.repeatCount){
-      seekAndPlay(practice.segStart);
+      seekAndPlay(practice.cumulative ? practice.cumulativeStart : practice.segStart);
     } else {
       practice.repDone=0;
-      advanceSegmentAuto();
+      if(practice.reviewPending){
+        advanceSegmentReal();
+      } else {
+        advanceSegmentAuto();
+      }
     }
   } else {
     seekAndPlay(practice.cumulative?practice.cumulativeStart:practice.segStart);
@@ -2879,6 +2951,10 @@ document.getElementById('stopTeacher').addEventListener('click', stopPractice);
 document.getElementById('teacherNextBtn').addEventListener('click', ()=>nextSegment('teacher'));
 document.getElementById('teacherPrevBtn').addEventListener('click', ()=>prevSegment('teacher'));
 document.getElementById('teacherFromStartBtn').addEventListener('click', ()=>startFromBeginning('teacher'));
+document.getElementById('teacherSetBeginningBtn').addEventListener('click', ()=>{
+  teacherBeginningPoint = audio.currentTime;
+  document.getElementById('teacherBeginningVal').textContent = fmtTime(teacherBeginningPoint);
+});
 
 document.getElementById('startContinuous').addEventListener('click', ()=>startPane('continuous'));
 document.getElementById('stopContinuous').addEventListener('click', stopPractice);
@@ -3016,6 +3092,19 @@ async function init(){
   renderHome();
   renderLibrary();
   setupNativeNotificationBridge();
+  hideNativeSplashScreen();
+}
+/* Safety net: launchAutoHide (set in capacitor.config.json) already hides the
+   splash automatically once the WebView is ready, with launchShowDuration:0
+   meaning no artificial delay — this just guarantees it's gone the moment
+   our own app has finished its first render, in case autoHide timing ever
+   lags on a particular device. No-ops harmlessly outside the native app. */
+function hideNativeSplashScreen(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen){
+      window.Capacitor.Plugins.SplashScreen.hide();
+    }
+  }catch(e){}
 }
 init();
 
