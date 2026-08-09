@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.media.app.NotificationCompat.MediaStyle;
 
 public class PlaybackService extends Service {
     public static final String CHANNEL_ID = "playback_channel";
@@ -112,17 +113,21 @@ public class PlaybackService extends Service {
             // Five actions: outer pair skips the whole hymn, inner pair steps
             // through whatever practice mode (AB repeat / Teacher / Continuous)
             // is currently active — mirrors the in-app Next/Previous for that mode.
+            // MediaStyle keeps all 5 available (swipe to expand); compact view
+            // shows the 3 most relevant while actively practicing a segment.
             builder
                 .addAction(android.R.drawable.ic_media_previous, "Previous hymn", actionIntent(ACTION_PREV))
                 .addAction(android.R.drawable.ic_media_rew, "Previous segment", actionIntent(ACTION_MODE_PREV))
                 .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", actionIntent(playPauseAction))
                 .addAction(android.R.drawable.ic_media_ff, "Next segment", actionIntent(ACTION_MODE_NEXT))
-                .addAction(android.R.drawable.ic_media_next, "Next hymn", actionIntent(ACTION_NEXT));
+                .addAction(android.R.drawable.ic_media_next, "Next hymn", actionIntent(ACTION_NEXT))
+                .setStyle(new MediaStyle().setShowActionsInCompactView(1, 2, 3));
         } else {
             builder
                 .addAction(android.R.drawable.ic_media_previous, "Previous", actionIntent(ACTION_PREV))
                 .addAction(playPauseIcon, isPlaying ? "Pause" : "Play", actionIntent(playPauseAction))
-                .addAction(android.R.drawable.ic_media_next, "Next", actionIntent(ACTION_NEXT));
+                .addAction(android.R.drawable.ic_media_next, "Next", actionIntent(ACTION_NEXT))
+                .setStyle(new MediaStyle().setShowActionsInCompactView(0, 1, 2));
         }
 
         return builder.build();

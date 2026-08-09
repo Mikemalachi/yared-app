@@ -35,13 +35,20 @@ jobs:
       - name: Sync web assets into native project
         run: npx cap sync android
 
+      - name: Generate app icon
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#F6EED9' --iconBackgroundColorDark '#1C1712'
+
       - name: Add permissions to the manifest
         run: |
-          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <application#' android/app/src/main/AndroidManifest.xml
 
       - name: Register the background-playback service in the manifest
         run: |
           sed -i 's#</application>#    <service android:name=".PlaybackService" android:enabled="true" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n</application>#' android/app/src/main/AndroidManifest.xml
+
+      - name: Add MediaStyle notification dependency
+        run: |
+          sed -i 's#dependencies {#dependencies {\n    implementation "androidx.media:media:1.7.0"#' android/app/build.gradle
 
       - name: Copy native background-playback plugin into the project
         run: |
@@ -49,6 +56,7 @@ jobs:
           cp native-templates/MainActivity.java android/app/src/main/java/com/yared/hymntracker/MainActivity.java
           cp native-templates/PlaybackService.java android/app/src/main/java/com/yared/hymntracker/PlaybackService.java
           cp native-templates/PlaybackNotificationPlugin.java android/app/src/main/java/com/yared/hymntracker/PlaybackNotificationPlugin.java
+          cp native-templates/AudioFileSaverPlugin.java android/app/src/main/java/com/yared/hymntracker/AudioFileSaverPlugin.java
 
       - name: Build debug APK
         working-directory: android

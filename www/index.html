@@ -264,7 +264,7 @@
     border-radius:10px; margin-bottom:8px;
   }
   .queue-item .t{flex:1; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .queue-item .mini-btn{background:var(--parchment-dim); border:1px solid var(--line); border-radius:7px; width:30px; height:30px; font-size:13px;}
+  .mini-btn{background:var(--parchment-dim); border:1px solid var(--line); border-radius:7px; width:30px; height:30px; font-size:13px; flex-shrink:0;}
 
   .heat-wrap{overflow-x:auto; padding-bottom:6px;}
   .heatmap{display:grid; grid-template-rows:repeat(7,12px); grid-auto-flow:column; gap:3px; width:max-content;}
@@ -1335,12 +1335,75 @@ const EXT_BY_MIME = {
 function sanitizeFilenamePart(s){
   return (s||'').replace(/[\\/:*?"<>|]/g,'').trim() || 'Untitled';
 }
-/* Downloads a hymn's audio to the device. The suggested filename includes
-   Month/Celebration/Title as path segments — desktop browsers (e.g. Chrome)
-   will typically create that subfolder structure inside Downloads, but most
-   mobile browsers and Android WebViews flatten or sanitize slashes instead,
-   since a web page can't force arbitrary folder creation on the OS for
-   security reasons. This gives the best result available in each browser. */
+function getFileSaverPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AudioFileSaver){
+      return window.Capacitor.Plugins.AudioFileSaver;
+    }
+  }catch(e){}
+  return null;
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(String(r.result).split(',')[1] || '');
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+let fileAccessGranted = false;
+/* Asks the native side for storage access. On Android 10+ this is a no-op
+   (modern scoped storage doesn't need it for this use case) — on older
+   Android it triggers the real storage-permission prompt. In a plain
+   browser (no native plugin) it just resolves true and downloads fall
+   back to the browser's own download mechanism. */
+async function ensureFileAccess(){
+  const plugin = getFileSaverPlugin();
+  if(!plugin){ return true; }
+  if(fileAccessGranted) return true;
+  try{
+    const res = await plugin.requestAccess();
+    fileAccessGranted = !!(res && res.granted);
+    if(!fileAccessGranted) toast('Storage access was not granted');
+    return fileAccessGranted;
+  }catch(e){
+    toast('Could not request storage access');
+    return false;
+  }
+}
+/* Saves a blob via the native plugin into Music/Yared music/<month>/<celebration>[/<extraSub>]/<title>.<ext>,
+   falling back to a plain browser download (best-effort path hint only)
+   when the native plugin isn't available. */
+async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
+  const ext = EXT_BY_MIME[blob.type] || 'mp3';
+  const filename = `${sanitizeFilenamePart(title)}.${ext}`;
+  const subPath = [sanitizeFilenamePart(month||'Unsorted'), sanitizeFilenamePart(celebration||'Uncategorized'), extraSub?sanitizeFilenamePart(extraSub):null]
+    .filter(Boolean).join('/');
+
+  const plugin = getFileSaverPlugin();
+  if(plugin){
+    const ok = await ensureFileAccess();
+    if(!ok) return;
+    toast('Saving…');
+    try{
+      const data = await blobToBase64(blob);
+      const result = await plugin.save({data, filename, subPath, mimeType: blob.type||'audio/mpeg'});
+      toast(result && result.path ? 'Saved to Music/Yared music/'+subPath : 'Saved');
+    }catch(err){
+      toast('Could not save file: '+(err && err.message ? err.message : 'unknown error'));
+    }
+    return;
+  }
+
+  // Browser fallback — no real folder guarantee, see caveat in prior notes.
+  const path = `${subPath}/${filename}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = path;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  toast('Downloading…');
+}
 async function downloadHymnAudio(hymnId){
   const h = await dbGet('hymns', hymnId);
   if(!h) return;
@@ -1360,14 +1423,19 @@ async function downloadHymnAudio(hymnId){
     return;
   }
   if(!blob){ toast('No audio attached to this hymn'); return; }
-  const ext = EXT_BY_MIME[blob.type] || 'mp3';
-  const path = `${sanitizeFilenamePart(h.month||'Unsorted')}/${sanitizeFilenamePart(h.celebration||'Uncategorized')}/${sanitizeFilenamePart(h.title)}.${ext}`;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = path;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=> URL.revokeObjectURL(url), 4000);
-  toast('Downloading…');
+  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title});
+}
+async function downloadRecording(hymnId, recordingId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  const rec = (h.recordings||[]).find(r=>r.id===recordingId);
+  if(!rec) return;
+  const mediaRec = await dbGet('media', rec.mediaId);
+  if(!mediaRec || !mediaRec.blob){ toast('Recording not found'); return; }
+  await saveAudioToDevice(mediaRec.blob, {
+    month:h.month, celebration:h.celebration, extraSub:'Recording',
+    title: `${h.title} - ${rec.label}`
+  });
 }
 
 async function downloadOffline(hymnId){
@@ -1974,6 +2042,16 @@ document.getElementById('toggleRecordBtn').addEventListener('click', async ()=>{
     }
   }
 });
+let activeRecordingAudio = null;
+let activeRecordingId = null;
+function stopActiveRecordingPlayback(){
+  if(activeRecordingAudio){
+    activeRecordingAudio.pause();
+    activeRecordingAudio.src='';
+  }
+  activeRecordingAudio = null;
+  activeRecordingId = null;
+}
 function renderRecordingsList(){
   const el = document.getElementById('recordingsList');
   el.innerHTML='';
@@ -1982,14 +2060,25 @@ function renderRecordingsList(){
     row.className='rec-item';
     row.innerHTML = `<span class="t">${escapeHtml(r.label)}</span>
       <button class="mini-btn" data-a="play">▶</button>
+      <button class="mini-btn" data-a="dl">⇩</button>
       <button class="mini-btn" data-a="del">✕</button>`;
     row.querySelector('[data-a=play]').addEventListener('click', async ()=>{
       const url = await urlFor(r.mediaId);
-      if(url){ const p = new Audio(url); p.play(); }
+      if(!url) return;
+      stopActiveRecordingPlayback();
+      activeRecordingAudio = new Audio(url);
+      activeRecordingId = r.id;
+      activeRecordingAudio.play();
+      activeRecordingAudio.addEventListener('ended', ()=>{
+        if(activeRecordingId===r.id) stopActiveRecordingPlayback();
+      });
     });
+    row.querySelector('[data-a=dl]').addEventListener('click', ()=> downloadRecording(currentHymn.id, r.id));
     row.querySelector('[data-a=del]').addEventListener('click', async ()=>{
+      if(activeRecordingId===r.id) stopActiveRecordingPlayback();
       currentHymn.recordings = currentHymn.recordings.filter(x=>x.id!==r.id);
       await dbPut('hymns', currentHymn);
+      await dbDelete('media', r.mediaId).catch(()=>{});
       renderRecordingsList();
     });
     el.appendChild(row);
@@ -2073,6 +2162,7 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
   if(!h) return;
   // stop any active practice modes from the previous hymn
   stopPractice(); ab.enabled=false; updateAbButton();
+  if(typeof stopActiveRecordingPlayback==='function') stopActiveRecordingPlayback();
   ab.a=null; ab.b=null; updateAbLabels();
   teacherAB={a:null,b:null}; contAB={a:null,b:null};
   updateAbFieldDisplay('teacher'); updateAbFieldDisplay('continuous');

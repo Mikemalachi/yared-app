@@ -6,7 +6,10 @@ GitHub's own cloud servers.
 ## How it works
 
 1. `www/index.html` is the entire app (single file, offline-capable).
-2. `native-templates/` holds three small native Android files that give
+2. `assets/icon.png` is the app icon (Saint Yared). The workflow runs
+   `@capacitor/assets` to generate every required Android icon size
+   and adaptive-icon layer from it automatically.
+3. `native-templates/` holds three small native Android files that give
    the app **real background playback with a notification** (play/pause/
    next/previous, survives the screen turning off):
    - `PlaybackService.java` — a foreground Service that shows the
