@@ -1,0 +1,63 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync web assets into native project
+        run: npx cap sync android
+
+      - name: Add permissions to the manifest
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <application#' android/app/src/main/AndroidManifest.xml
+
+      - name: Register the background-playback service in the manifest
+        run: |
+          sed -i 's#</application>#    <service android:name=".PlaybackService" android:enabled="true" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n</application>#' android/app/src/main/AndroidManifest.xml
+
+      - name: Copy native background-playback plugin into the project
+        run: |
+          mkdir -p android/app/src/main/java/com/yared/hymntracker
+          cp native-templates/MainActivity.java android/app/src/main/java/com/yared/hymntracker/MainActivity.java
+          cp native-templates/PlaybackService.java android/app/src/main/java/com/yared/hymntracker/PlaybackService.java
+          cp native-templates/PlaybackNotificationPlugin.java android/app/src/main/java/com/yared/hymntracker/PlaybackNotificationPlugin.java
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: yared-hymn-tracker-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
