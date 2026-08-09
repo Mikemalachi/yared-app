@@ -1,0 +1,8 @@
+{
+  "appId": "com.yared.hymntracker",
+  "appName": "Yared Hymn Tracker",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}
