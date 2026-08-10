@@ -37,13 +37,18 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_due_hymns);
 
             views.setTextViewText(R.id.widget_title, title);
+            // Only one subtitle line shows at a time — status takes priority
+            // when there's something actively playing/reviewing, otherwise
+            // the due count — keeps this fitting a compact 4x1 widget.
             if (statusText != null && !statusText.isEmpty()) {
                 views.setTextViewText(R.id.widget_status, statusText);
                 views.setViewVisibility(R.id.widget_status, View.VISIBLE);
+                views.setViewVisibility(R.id.widget_due_summary, View.GONE);
             } else {
                 views.setViewVisibility(R.id.widget_status, View.GONE);
+                views.setTextViewText(R.id.widget_due_summary, dueCount > 0 ? (dueCount + " hymn(s) due") : "Nothing due");
+                views.setViewVisibility(R.id.widget_due_summary, View.VISIBLE);
             }
-            views.setTextViewText(R.id.widget_due_summary, dueCount > 0 ? (dueCount + " hymn(s) due") : "Nothing due");
             views.setTextViewText(R.id.widget_play_pause, playing ? "\u275A\u275A" : "\u25B6");
 
             // Mode-aware controls: mirrors the notification — when a practice
