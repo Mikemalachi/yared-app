@@ -5,7 +5,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
@@ -15,6 +17,7 @@ import androidx.media.app.NotificationCompat.MediaStyle;
 public class PlaybackService extends Service {
     public static final String CHANNEL_ID = "playback_channel";
     public static final int NOTIF_ID = 4201;
+    public static final String PREFS_NAME = "yared_prefs";
 
     public static final String ACTION_PLAY = "com.yared.hymntracker.ACTION_PLAY";
     public static final String ACTION_PAUSE = "com.yared.hymntracker.ACTION_PAUSE";
@@ -67,16 +70,36 @@ public class PlaybackService extends Service {
                     statusText = intent.getStringExtra(EXTRA_STATUS_TEXT);
                 }
                 startForeground(NOTIF_ID, buildNotification());
+                persistStateForWidget();
+                DueHymnsWidgetProvider.refreshAll(this);
             } else if (ACTION_STOP.equals(action)) {
                 stopForeground(true);
                 stopSelf();
             } else {
+                // Control action (play/pause/next/prev/mode next/prev). If no
+                // app instance is alive to handle it (listener never got
+                // registered — e.g. a widget tap after the app was fully
+                // killed), Android still requires any freshly-started service
+                // to promote to foreground; satisfy that, then stop cleanly
+                // rather than leaving a dangling service or crashing.
                 if (listener != null) {
                     listener.onControl(action);
+                } else {
+                    startForeground(NOTIF_ID, buildNotification());
+                    stopForeground(true);
+                    stopSelf();
                 }
             }
         }
         return START_NOT_STICKY;
+    }
+
+    private void persistStateForWidget() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+            .putString("nowPlayingTitle", currentTitle)
+            .putBoolean("nowPlayingIsPlaying", isPlaying)
+            .apply();
     }
 
     private void createChannel() {

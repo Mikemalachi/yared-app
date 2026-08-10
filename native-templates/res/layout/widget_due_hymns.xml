@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F6EED9"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Yared Hymn Tracker"
+        android:textColor="#2B2118"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_due_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Nothing due"
+        android:textColor="#5A4B3A"
+        android:textSize="11sp"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/widget_due_1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#5A4B3A"
+        android:textSize="11sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_due_2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#5A4B3A"
+        android:textSize="11sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_due_3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#5A4B3A"
+        android:textSize="11sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/widget_prev"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="\u23EE"
+            android:textColor="#2B2118"
+            android:background="@android:color/transparent" />
+
+        <Button
+            android:id="@+id/widget_play_pause"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="\u25B6"
+            android:textColor="#7A2E2E"
+            android:background="@android:color/transparent" />
+
+        <Button
+            android:id="@+id/widget_next"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="\u23ED"
+            android:textColor="#2B2118"
+            android:background="@android:color/transparent" />
+    </LinearLayout>
+</LinearLayout>

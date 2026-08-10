@@ -99,6 +99,20 @@
   nav.tabbar button .ic{font-size:18px;}
   nav.tabbar button.active{color:var(--gold-bright); background:rgba(217,167,65,0.12);}
 
+  .bulk-bar{
+    position:fixed; left:0; right:0; margin:0 auto; max-width:520px; bottom:0; z-index:29;
+    background:var(--surface); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 -4px 10px rgba(0,0,0,0.1);
+  }
+  .bulk-bar.hidden{display:none;}
+  .bulk-bar span{font-size:13px; font-weight:600; flex-shrink:0;}
+  .hymn-row.selectable{cursor:pointer;}
+  .hymn-row .select-check{
+    width:20px; height:20px; border-radius:6px; border:2px solid var(--line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:transparent;
+  }
+  .hymn-row .select-check.checked{background:var(--gold); border-color:var(--gold); color:#fff;}
+
   .mini-player{
     position:fixed; left:0; right:0; margin:0 auto; max-width:520px;
     z-index:28; background:var(--surface); border-top:1px solid var(--line);
@@ -269,6 +283,20 @@
   .empty-state{text-align:center; padding:40px 16px; color:var(--ink-soft);}
   .empty-state .big{font-size:34px; margin-bottom:8px;}
 
+  .pdf-progress-overlay{
+    position:fixed; inset:0; z-index:70; background:rgba(20,16,12,0.55);
+    display:none; align-items:center; justify-content:center;
+  }
+  .pdf-progress-overlay.active{display:flex;}
+  .pdf-progress-box{
+    background:var(--surface); border-radius:16px; padding:24px 28px; width:min(300px, 80vw);
+    text-align:center; box-shadow:var(--shadow);
+  }
+  .pdf-progress-box .pp-title{font-weight:600; font-size:14.5px; margin-bottom:4px;}
+  .pdf-progress-box .pp-sub{font-size:12px; color:var(--ink-soft); margin-bottom:14px;}
+  .pdf-progress-track{height:8px; background:var(--parchment-dim); border-radius:6px; overflow:hidden;}
+  .pdf-progress-fill{height:100%; width:0%; background:var(--gold); transition:width .2s ease;}
+
   .toast{
     position:fixed; bottom:96px; left:50%; transform:translateX(-50%); background:rgba(20,16,12,0.92); color:#fff;
     padding:10px 18px; border-radius:20px; font-size:13px; z-index:60; opacity:0; pointer-events:none;
@@ -400,8 +428,29 @@
         </div>
       </div>
 
+      <div class="card" id="backupNudge" style="display:none; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-weight:600; font-size:13.5px;">Backup reminder</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;" id="backupNudgeText"></div>
+        </div>
+        <button class="btn secondary" id="backupNudgeBtn">Export now</button>
+      </div>
+
       <div class="section-title">Recently added</div>
       <div id="recentList"></div>
+
+      <div class="section-title">Reminders</div>
+      <div class="card">
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+          <span style="font-size:13.5px; font-weight:600;">Daily practice reminder</span>
+          <input type="checkbox" id="reminderEnabled" style="width:auto;">
+        </label>
+        <div class="row" id="reminderTimeRow">
+          <select id="reminderHour" style="flex:1;"></select>
+          <select id="reminderMinute" style="flex:1;"></select>
+        </div>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Only works once this is built into the actual app — has no effect in a browser preview.</div>
+      </div>
 
       <div class="row" style="margin-top:6px;">
         <button class="btn ghost block" id="exportDataBtn" style="flex:1;">Export backup</button>
@@ -415,11 +464,21 @@
       <div class="row">
         <input type="search" id="searchInput" placeholder="Search hymns..." style="flex:1;">
         <button class="btn secondary" id="openBatchAdd" style="white-space:nowrap;">Batch add</button>
+        <button class="btn secondary" id="toggleSelectMode" style="white-space:nowrap;">Select</button>
       </div>
       <div id="categoryChips"></div>
       <div id="monthChips"></div>
       <div id="libraryList"></div>
     </section>
+
+    <div class="bulk-bar hidden" id="bulkBar">
+      <span id="bulkCount">0 selected</span>
+      <div class="row" style="gap:8px;">
+        <button class="btn secondary" id="bulkSetCategory">Category</button>
+        <button class="btn danger" id="bulkDelete">Delete</button>
+        <button class="btn ghost" id="bulkCancel">Cancel</button>
+      </div>
+    </div>
 
     <!-- REVISION -->
     <section class="screen" id="screen-revision">
@@ -502,6 +561,14 @@
         <button class="toggle-pill speed-pill" data-speed="1.5">1.5×</button>
         <button class="toggle-pill speed-pill" data-speed="2">2×</button>
       </div>
+      <div class="toggle-row" id="sleepTimerRow">
+        <button class="toggle-pill sleep-pill" data-mins="0">Off</button>
+        <button class="toggle-pill sleep-pill" data-mins="15">15m</button>
+        <button class="toggle-pill sleep-pill" data-mins="30">30m</button>
+        <button class="toggle-pill sleep-pill" data-mins="45">45m</button>
+        <button class="toggle-pill sleep-pill" data-mins="60">60m</button>
+      </div>
+      <div style="text-align:center; font-size:11.5px; color:var(--ink-soft); margin:-4px 0 10px; display:none;" id="sleepTimerStatus"></div>
 
       <div class="section-title">How well do you know this?</div>
       <div class="status-row" id="statusRow"></div>
@@ -692,11 +759,17 @@
     <div class="modal">
       <button class="modal-close" id="closeModal">✕</button>
       <h2 id="modalTitle">Add hymn</h2>
+
+      <div class="section-title" style="margin-top:2px;">Details</div>
       <label>Title</label>
       <input type="text" id="fTitle" placeholder="Hymn title">
       <label>Category</label>
       <div class="chip-select" id="fCategoryChips"></div>
-      <input type="text" id="fCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
+      <input type="text" id="fCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px; margin-bottom:12px;">
+      <label>Tags (comma separated)</label>
+      <input type="text" id="fTags" placeholder="e.g. sunday, advanced">
+
+      <div class="section-title">Calendar</div>
       <label>Month</label>
       <select id="fMonth">
         <option value="">— None —</option>
@@ -704,9 +777,8 @@
       <label>Celebration / feast</label>
       <input type="text" id="fCelebration" list="celebrationSuggestions" placeholder="e.g. Timket">
       <datalist id="celebrationSuggestions"></datalist>
-      <label>Tags (comma separated)</label>
-      <input type="text" id="fTags" placeholder="e.g. sunday, advanced">
-      <label>Audio source</label>
+
+      <div class="section-title">Audio</div>
       <div class="source-toggle">
         <button type="button" id="srcFileBtn" class="active">Upload file</button>
         <button type="button" id="srcLinkBtn">Paste link</button>
@@ -717,14 +789,18 @@
       <div id="audioLinkWrap" class="hidden">
         <input type="text" id="fAudioLink" placeholder="https://...">
       </div>
-      <div id="currentAudioNote" style="font-size:12px; color:var(--ink-soft); margin:-6px 0 10px;"></div>
-      <button class="btn secondary block hidden" id="downloadOfflineBtn" style="margin-bottom:12px;">Download for offline</button>
-      <label>Lyric images or PDF (you can select multiple; each PDF page becomes its own page)</label>
-      <input type="file" id="fImages" accept="image/*,application/pdf" multiple>
-      <div id="currentImagesNote" style="font-size:12px; color:var(--ink-soft); margin:-6px 0 6px;"></div>
+      <div id="currentAudioNote" style="font-size:12px; color:var(--ink-soft); margin:6px 0 0;"></div>
+      <button class="btn secondary block hidden" id="downloadOfflineBtn" style="margin-top:10px;">Download for offline</button>
+
+      <div class="section-title">Lyrics</div>
+      <div id="currentImagesNote" style="font-size:12px; color:var(--ink-soft); margin:-2px 0 8px;"></div>
       <div class="image-gallery" id="currentImagesGallery"></div>
-      <div class="row" style="margin-top:14px;">
+      <label style="margin-top:4px;">Add more pages (images or PDF)</label>
+      <input type="file" id="fImages" accept="image/*,application/pdf" multiple>
+
+      <div class="row" style="margin-top:16px;">
         <button class="btn block" id="saveHymn" style="flex:1;">Save</button>
+        <button class="btn secondary block" id="shareHymnBtn" style="flex:1;">Share</button>
         <button class="btn danger block hidden" id="deleteHymn" style="flex:1;">Delete</button>
       </div>
     </div>
@@ -814,7 +890,40 @@
       <div class="chip-select" id="batchFilesCategoryChips"></div>
       <input type="text" id="batchFilesCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
 
-      <button class="btn block" id="submitBatchAdd" style="margin-top:14px;">Add hymns</button>
+      <button class="btn block" id="submitBatchAdd" style="margin-top:14px;">Review each hymn ›</button>
+    </div>
+  </div>
+
+  <!-- Batch review wizard: one hymn at a time, with preview -->
+  <div class="modal-backdrop" id="batchReviewBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeBatchReview">✕</button>
+      <h2>Review hymn <span id="batchReviewPos">1 of 1</span></h2>
+
+      <audio id="batchReviewPreview" controls style="width:100%; margin-bottom:12px;"></audio>
+
+      <label>Title</label>
+      <input type="text" id="batchReviewTitle" placeholder="Hymn title">
+      <label>Category</label>
+      <div class="chip-select" id="batchReviewCategoryChips"></div>
+      <input type="text" id="batchReviewCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
+
+      <div class="section-title">Lyrics (optional)</div>
+      <input type="file" id="batchReviewImages" accept="image/*,application/pdf" multiple>
+      <div id="batchReviewImagesNote" style="font-size:12px; color:var(--ink-soft); margin:6px 0 0;"></div>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn secondary block" id="batchReviewSkip" style="flex:1;">Skip</button>
+        <button class="btn block" id="batchReviewAdd" style="flex:1;">Add &amp; Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pdf-progress-overlay" id="pdfProgressOverlay">
+    <div class="pdf-progress-box">
+      <div class="pp-title">Converting PDF…</div>
+      <div class="pp-sub" id="pdfProgressSub">Page 0 of 0</div>
+      <div class="pdf-progress-track"><div class="pdf-progress-fill" id="pdfProgressFill"></div></div>
     </div>
   </div>
 
@@ -882,12 +991,22 @@ if(window.pdfjsLib){
 function isPdfFile(file){
   return file && (file.type==='application/pdf' || /\.pdf$/i.test(file.name||''));
 }
-async function pdfFileToImageBlobs(file){
+function showPdfProgress(current, total){
+  document.getElementById('pdfProgressOverlay').classList.add('active');
+  document.getElementById('pdfProgressSub').textContent = `Page ${current} of ${total}`;
+  document.getElementById('pdfProgressFill').style.width = total ? ((current/total)*100)+'%' : '0%';
+}
+function hidePdfProgress(){
+  document.getElementById('pdfProgressOverlay').classList.remove('active');
+  document.getElementById('pdfProgressFill').style.width='0%';
+}
+async function pdfFileToImageBlobs(file, onProgress){
   if(!window.pdfjsLib){ throw new Error('PDF support did not load (no internet connection?)'); }
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data: buf}).promise;
   const blobs = [];
   for(let i=1; i<=pdf.numPages; i++){
+    if(onProgress) onProgress(i-1, pdf.numPages);
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({scale: 2});
     const canvas = document.createElement('canvas');
@@ -897,21 +1016,25 @@ async function pdfFileToImageBlobs(file){
     await page.render({canvasContext: ctx, viewport}).promise;
     const blob = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.92));
     if(blob) blobs.push(blob);
+    if(onProgress) onProgress(i, pdf.numPages);
   }
   return blobs;
 }
 /* Expands a FileList-derived array into individual image File/Blob-like
-   entries, converting any PDFs into one entry per page along the way. */
+   entries, converting any PDFs into one entry per page along the way,
+   with a visible per-page progress overlay while it works. */
 async function expandLyricFiles(files){
   const out = [];
   for(const f of files){
     if(isPdfFile(f)){
-      toast('Converting PDF pages…');
       try{
-        const pages = await pdfFileToImageBlobs(f);
+        showPdfProgress(0, 1);
+        const pages = await pdfFileToImageBlobs(f, (done,total)=> showPdfProgress(done,total));
         pages.forEach(b=> out.push(b));
       }catch(err){
         toast('Could not convert that PDF: '+err.message);
+      }finally{
+        hidePdfProgress();
       }
     } else {
       out.push(f);
@@ -1135,6 +1258,7 @@ function openAddWizard(){
 }
 function closeWizard(){
   document.getElementById('addWizardBackdrop').classList.remove('active');
+  document.getElementById('wAudioPreview').pause();
   if(wizardPreviewUrl){ URL.revokeObjectURL(wizardPreviewUrl); wizardPreviewUrl=null; }
 }
 document.getElementById('closeWizard').addEventListener('click', closeWizard);
@@ -1189,6 +1313,7 @@ document.getElementById('wImages').addEventListener('change', ()=>{
 
 function showWizardStep(i){
   wizardIndex = i;
+  document.getElementById('wAudioPreview').pause();
   wizardSteps.forEach((id,idx)=>{
     document.getElementById(id).classList.toggle('active', idx===i);
   });
@@ -1494,6 +1619,78 @@ async function downloadRecording(hymnId, recordingId){
   });
 }
 
+/* ============================================================
+   SHARE — uses the official @capacitor/share + @capacitor/filesystem
+   plugins. Link-based hymns share the link directly; local files get
+   written to the app's cache dir first (Capacitor's built-in
+   FileProvider handles turning that into a shareable content:// URI).
+   Falls back to the browser's Web Share API when not in the native app.
+   ============================================================ */
+function getSharePlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share){
+      return window.Capacitor.Plugins.Share;
+    }
+  }catch(e){}
+  return null;
+}
+function getFilesystemPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+      return window.Capacitor.Plugins.Filesystem;
+    }
+  }catch(e){}
+  return null;
+}
+async function shareHymn(hymnId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  const sharePlugin = getSharePlugin();
+
+  if(!sharePlugin){
+    if(navigator.share){
+      try{
+        await navigator.share({
+          title: h.title,
+          text: `${h.title} — Yared Hymn Tracker`,
+          url: h.audioType==='link' ? h.audioUrl : undefined
+        });
+      }catch(e){}
+    } else {
+      toast('Sharing needs the installed app');
+    }
+    return;
+  }
+
+  if(h.audioType==='link' && h.audioUrl){
+    try{
+      await sharePlugin.share({title:h.title, text:`${h.title} — shared from Yared Hymn Tracker`, url:h.audioUrl, dialogTitle:'Share hymn'});
+    }catch(e){}
+    return;
+  }
+
+  let blob=null;
+  if(h.offlineId){ const rec=await dbGet('media', h.offlineId); blob=rec&&rec.blob; }
+  if(!blob && h.audioId){ const rec=await dbGet('media', h.audioId); blob=rec&&rec.blob; }
+  if(!blob){ toast('No audio to share'); return; }
+
+  const fsPlugin = getFilesystemPlugin();
+  if(!fsPlugin){ toast('Could not share this file'); return; }
+  try{
+    toast('Preparing to share…');
+    const base64 = await blobToBase64(blob);
+    const ext = EXT_BY_MIME[blob.type] || 'mp3';
+    const filename = sanitizeFilenamePart(h.title)+'.'+ext;
+    const writeRes = await fsPlugin.writeFile({path:filename, data:base64, directory:'CACHE'});
+    await sharePlugin.share({title:h.title, text:`${h.title} — shared from Yared Hymn Tracker`, files:[writeRes.uri], dialogTitle:'Share hymn'});
+  }catch(err){
+    toast('Could not share: '+(err && err.message ? err.message : 'unknown error'));
+  }
+}
+document.getElementById('shareHymnBtn').addEventListener('click', ()=>{
+  if(editingHymnId) shareHymn(editingHymnId);
+});
+
 async function downloadOffline(hymnId){
   const h = await dbGet('hymns', hymnId);
   if(!h || !h.audioUrl) return;
@@ -1588,33 +1785,100 @@ function renderLibrary(){
   }
   list.forEach(h=>{
     const row = document.createElement('div');
-    row.className='hymn-row';
+    row.className='hymn-row'+(selectMode?' selectable':'');
     const statusKey = (h.stats && h.stats.status) || 'new';
     const statusDef = STATUS_DEFS[statusKey];
     const subParts = [h.category||'Uncategorized'];
     if(h.duration) subParts.push(fmtTime(h.duration));
     if(h.celebration) subParts.push(h.celebration);
-    row.innerHTML = `
-      <div class="thumb">${h.title.charAt(0).toUpperCase()}</div>
+    const metaHtml = `
       <div class="meta">
         <div class="t"><span class="status-dot" style="background:${statusDef.color}" title="${statusDef.label}"></span>${escapeHtml(h.title)}</div>
         <div class="s">${escapeHtml(subParts.join(' · '))}</div>
-      </div>
-      <button class="icon-btn" data-action="download" style="width:32px;height:32px; flex-shrink:0;" title="Download audio">⇩</button>
-      <button class="icon-btn" data-action="queue" style="width:32px;height:32px; flex-shrink:0;" title="Add to queue">+Q</button>
-      <button class="fav ${h.favorite?'on':''}">${h.favorite?'♥':'♡'}</button>
-    `;
-    row.querySelector('[data-action=queue]').addEventListener('click', (e)=>{ e.stopPropagation(); addToQueue(h.id); });
-    row.querySelector('[data-action=download]').addEventListener('click', (e)=>{ e.stopPropagation(); downloadHymnAudio(h.id); });
-    row.querySelector('.fav').addEventListener('click', (e)=>toggleFavorite(h.id,e));
-    row.addEventListener('click', ()=>openEditModal(h.id));
-    row.addEventListener('dblclick', ()=>loadHymnIntoPlayer(h.id, list.map(x=>x.id)));
-    // single tap opens edit; add a small play affordance via long tap alternative: use thumb click to play
-    row.querySelector('.thumb').addEventListener('click',(e)=>{ e.stopPropagation(); loadHymnIntoPlayer(h.id, list.map(x=>x.id)); showScreen('player'); });
+      </div>`;
+    if(selectMode){
+      const checked = selectedHymnIds.has(h.id);
+      row.innerHTML = `
+        <div class="select-check${checked?' checked':''}">✓</div>
+        ${metaHtml}
+      `;
+      row.addEventListener('click', ()=> toggleHymnSelection(h.id));
+    } else {
+      row.innerHTML = `
+        <div class="thumb">${h.title.charAt(0).toUpperCase()}</div>
+        ${metaHtml}
+        <button class="icon-btn" data-action="download" style="width:32px;height:32px; flex-shrink:0;" title="Download audio">⇩</button>
+        <button class="icon-btn" data-action="queue" style="width:32px;height:32px; flex-shrink:0;" title="Add to queue">+Q</button>
+        <button class="fav ${h.favorite?'on':''}">${h.favorite?'♥':'♡'}</button>
+      `;
+      row.querySelector('[data-action=queue]').addEventListener('click', (e)=>{ e.stopPropagation(); addToQueue(h.id); });
+      row.querySelector('[data-action=download]').addEventListener('click', (e)=>{ e.stopPropagation(); downloadHymnAudio(h.id); });
+      row.querySelector('.fav').addEventListener('click', (e)=>toggleFavorite(h.id,e));
+      row.addEventListener('click', ()=>openEditModal(h.id));
+      row.addEventListener('dblclick', ()=>loadHymnIntoPlayer(h.id, list.map(x=>x.id)));
+      row.querySelector('.thumb').addEventListener('click',(e)=>{ e.stopPropagation(); loadHymnIntoPlayer(h.id, list.map(x=>x.id)); showScreen('player'); });
+    }
     container.appendChild(row);
   });
 }
 document.getElementById('searchInput').addEventListener('input', renderLibrary);
+
+/* ============================================================
+   BULK SELECT
+   ============================================================ */
+let selectMode = false;
+let selectedHymnIds = new Set();
+function updateBulkBar(){
+  document.getElementById('bulkBar').classList.toggle('hidden', !selectMode || selectedHymnIds.size===0);
+  document.getElementById('bulkCount').textContent = selectedHymnIds.size+' selected';
+}
+function toggleHymnSelection(id){
+  if(selectedHymnIds.has(id)) selectedHymnIds.delete(id); else selectedHymnIds.add(id);
+  updateBulkBar();
+  renderLibrary();
+}
+document.getElementById('toggleSelectMode').addEventListener('click', ()=>{
+  selectMode = !selectMode;
+  selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.toggle('on', selectMode);
+  updateBulkBar();
+  renderLibrary();
+});
+document.getElementById('bulkCancel').addEventListener('click', ()=>{
+  selectMode=false; selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.remove('on');
+  updateBulkBar();
+  renderLibrary();
+});
+document.getElementById('bulkDelete').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  if(!confirm(`Delete ${selectedHymnIds.size} hymn(s)? This can't be undone.`)) return;
+  for(const id of selectedHymnIds){
+    await dbDelete('hymns', id);
+  }
+  selectMode=false; selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.remove('on');
+  await loadHymns();
+  updateBulkBar();
+  renderLibrary();
+  renderHome();
+  toast('Deleted');
+});
+document.getElementById('bulkSetCategory').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const cats = await getAllCategories();
+  const label = prompt('Set category for '+selectedHymnIds.size+' hymn(s):\n('+cats.join(', ')+')', cats[0]||'');
+  if(label==null) return;
+  if(label && !DEFAULT_CATEGORY_PRESETS.includes(label)) await addCustomCategory(label);
+  for(const id of selectedHymnIds){
+    const h = await dbGet('hymns', id);
+    if(h){ h.category=label; await dbPut('hymns', h); }
+  }
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Category updated');
+});
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtTime(sec){
@@ -1651,6 +1915,19 @@ async function renderHome(){
   const now = Date.now();
   const due = hymns.filter(h=> h.stats && h.stats.dueAt!=null && h.stats.dueAt<=now);
   document.getElementById('revisionCount').textContent = due.length ? due.length+' hymn(s) due today' : 'Nothing due today';
+  nativeUpdateDueInfo(due);
+
+  // backup nudge
+  const backupRec = await dbGet('meta','lastBackupAt');
+  const lastBackupAt = backupRec ? backupRec.value : null;
+  const daysSince = lastBackupAt ? Math.floor((Date.now()-lastBackupAt)/86400000) : null;
+  const nudge = document.getElementById('backupNudge');
+  if(hymns.length && (daysSince===null || daysSince>=14)){
+    nudge.style.display='flex';
+    document.getElementById('backupNudgeText').textContent = lastBackupAt ? `Last backup: ${daysSince} day(s) ago` : 'You have never backed up your data';
+  } else {
+    nudge.style.display='none';
+  }
 
   // recent
   const recent = hymns.slice(0,5);
@@ -1669,6 +1946,69 @@ async function renderHome(){
     });
   }
 }
+document.getElementById('backupNudgeBtn').addEventListener('click', exportAllData);
+
+/* ============================================================
+   DAILY PRACTICE REMINDER — native notification, scheduled via a
+   small custom plugin (added by the GitHub Actions build). No-ops
+   harmlessly outside the built app.
+   ============================================================ */
+function getReminderPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Reminder){
+      return window.Capacitor.Plugins.Reminder;
+    }
+  }catch(e){}
+  return null;
+}
+function nativeUpdateDueInfo(dueList){
+  const plugin = getReminderPlugin();
+  if(!plugin) return;
+  const titles = dueList.slice(0,5).map(h=>h.title);
+  plugin.updateDueInfo({count: dueList.length, titles}).catch(()=>{});
+}
+function populateReminderTimeSelects(){
+  const hourSel = document.getElementById('reminderHour');
+  const minSel = document.getElementById('reminderMinute');
+  if(!hourSel.options.length){
+    for(let h=0; h<24; h++){
+      const opt=document.createElement('option'); opt.value=h;
+      const h12 = h%12===0?12:h%12; const ampm = h<12?'AM':'PM';
+      opt.textContent = `${h12}:00 ${ampm}`; hourSel.appendChild(opt);
+    }
+  }
+  if(!minSel.options.length){
+    [0,15,30,45].forEach(m=>{
+      const opt=document.createElement('option'); opt.value=m; opt.textContent=String(m).padStart(2,'0'); minSel.appendChild(opt);
+    });
+  }
+}
+async function loadReminderSettings(){
+  populateReminderTimeSelects();
+  const rec = await dbGet('meta','reminderSettings');
+  const settings = rec ? rec.value : {enabled:false, hour:9, minute:0};
+  document.getElementById('reminderEnabled').checked = !!settings.enabled;
+  document.getElementById('reminderHour').value = settings.hour;
+  document.getElementById('reminderMinute').value = settings.minute;
+  document.getElementById('reminderTimeRow').style.opacity = settings.enabled ? '1' : '.5';
+}
+async function saveReminderSettings(){
+  const enabled = document.getElementById('reminderEnabled').checked;
+  const hour = parseInt(document.getElementById('reminderHour').value)||9;
+  const minute = parseInt(document.getElementById('reminderMinute').value)||0;
+  await dbPut('meta', {key:'reminderSettings', value:{enabled, hour, minute}});
+  document.getElementById('reminderTimeRow').style.opacity = enabled ? '1' : '.5';
+  const plugin = getReminderPlugin();
+  if(!plugin){ if(enabled) toast('Will take effect once built into the app'); return; }
+  try{
+    if(enabled) await plugin.schedule({hour, minute});
+    else await plugin.cancel();
+  }catch(e){ toast('Could not update reminder'); }
+}
+document.getElementById('reminderEnabled').addEventListener('change', saveReminderSettings);
+document.getElementById('reminderHour').addEventListener('change', saveReminderSettings);
+document.getElementById('reminderMinute').addEventListener('change', saveReminderSettings);
+
 document.getElementById('suggestedBtn').addEventListener('click', ()=>{
   if(!hymns.length){ toast('Add a hymn first'); return; }
   // suggested = least recently practiced, favorites weighted first
@@ -1951,13 +2291,15 @@ document.getElementById('closeBatchModal').addEventListener('click', ()=>{
 function filenameToTitle(name){
   return name.replace(/\.[a-zA-Z0-9]+$/,'').replace(/[-_]+/g,' ').trim() || 'Untitled hymn';
 }
-document.getElementById('submitBatchAdd').addEventListener('click', async ()=>{
+document.getElementById('submitBatchAdd').addEventListener('click', ()=>{
   const month = document.getElementById('batchMonth').value;
   const celebration = document.getElementById('batchCelebration').value.trim();
   const lines = document.getElementById('batchText').value.split('\n').map(l=>l.trim()).filter(Boolean);
   const localFiles = Array.from(document.getElementById('batchFiles').files);
   if(!lines.length && !localFiles.length){ toast('Paste some lines or pick local files first'); return; }
-  let count=0;
+
+  const filesCategory = document.getElementById('batchFilesCategoryCustom').value.trim() || batchFilesCategory || '';
+  const queue = [];
 
   for(const line of lines){
     let title, category='', url;
@@ -1972,42 +2314,145 @@ document.getElementById('submitBatchAdd').addEventListener('click', async ()=>{
       catch(e){ title='Untitled hymn'; }
     }
     if(!url) continue;
-    if(category && !DEFAULT_CATEGORY_PRESETS.includes(category)) await addCustomCategory(category);
-    const hymn = {
-      id: uid(), title: title||'Untitled hymn', category, month, celebration, tags:[], favorite:false,
-      audioType:'link', audioId:null, audioUrl:url, offlineId:null,
-      images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
-      stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
-      createdAt: Date.now(), updatedAt: Date.now()
-    };
-    await dbPut('hymns', hymn);
-    count++;
+    queue.push({title: title||'Untitled hymn', category, month, celebration, audioType:'link', audioUrl:url, audioFile:null});
+  }
+  for(const file of localFiles){
+    queue.push({title: filenameToTitle(file.name), category: filesCategory, month, celebration, audioType:'file', audioUrl:null, audioFile:file});
   }
 
-  if(localFiles.length){
-    const customCat = document.getElementById('batchFilesCategoryCustom').value.trim();
-    const category = customCat || batchFilesCategory || '';
-    if(customCat) await addCustomCategory(customCat);
-    for(const file of localFiles){
+  if(!queue.length){ toast('Nothing to review'); return; }
+  document.getElementById('batchModalBackdrop').classList.remove('active');
+  openBatchReview(queue);
+});
+
+/* ============================================================
+   BATCH REVIEW WIZARD — steps through each parsed/picked hymn one
+   at a time: preview the audio, adjust title/category, optionally
+   attach lyrics, then Add & Next (or Skip) before it's actually saved.
+   ============================================================ */
+let batchReviewQueue = [];
+let batchReviewIndex = 0;
+let batchReviewSelectedCategory = '';
+let batchReviewPreviewUrl = null;
+let batchReviewAddedCount = 0;
+
+async function openBatchReview(queue){
+  batchReviewQueue = queue;
+  batchReviewIndex = 0;
+  batchReviewAddedCount = 0;
+  document.getElementById('batchReviewBackdrop').classList.add('active');
+  await showBatchReviewItem();
+}
+function closeBatchReview(){
+  document.getElementById('batchReviewBackdrop').classList.remove('active');
+  document.getElementById('batchReviewPreview').pause();
+  if(batchReviewPreviewUrl){ URL.revokeObjectURL(batchReviewPreviewUrl); batchReviewPreviewUrl=null; }
+}
+document.getElementById('closeBatchReview').addEventListener('click', async ()=>{
+  closeBatchReview();
+  await loadHymns(); renderLibrary(); renderHome();
+  if(batchReviewAddedCount) toast(batchReviewAddedCount+' hymn(s) added');
+});
+
+async function showBatchReviewItem(){
+  const item = batchReviewQueue[batchReviewIndex];
+  document.getElementById('batchReviewPos').textContent = (batchReviewIndex+1)+' of '+batchReviewQueue.length;
+  document.getElementById('batchReviewTitle').value = item.title;
+  document.getElementById('batchReviewImages').value='';
+  document.getElementById('batchReviewImagesNote').textContent='';
+  batchReviewSelectedCategory = item.category || '';
+  await renderBatchReviewCategoryChips(batchReviewSelectedCategory);
+  document.getElementById('batchReviewCategoryCustom').value =
+    (batchReviewSelectedCategory && !(await getAllCategories()).includes(batchReviewSelectedCategory)) ? batchReviewSelectedCategory : '';
+
+  const preview = document.getElementById('batchReviewPreview');
+  preview.pause();
+  if(batchReviewPreviewUrl){ URL.revokeObjectURL(batchReviewPreviewUrl); batchReviewPreviewUrl=null; }
+  if(item.audioType==='file' && item.audioFile){
+    batchReviewPreviewUrl = URL.createObjectURL(item.audioFile);
+    preview.src = batchReviewPreviewUrl;
+  } else if(item.audioUrl){
+    preview.src = item.audioUrl;
+  } else {
+    preview.removeAttribute('src');
+  }
+
+  const addBtn = document.getElementById('batchReviewAdd');
+  addBtn.textContent = (batchReviewIndex===batchReviewQueue.length-1) ? 'Add & Finish' : 'Add & Next ›';
+}
+async function renderBatchReviewCategoryChips(current){
+  const cats = await getAllCategories();
+  const wrap = document.getElementById('batchReviewCategoryChips');
+  wrap.innerHTML='';
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(c===current?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{
+      batchReviewSelectedCategory=c;
+      document.getElementById('batchReviewCategoryCustom').value='';
+      renderBatchReviewCategoryChips(c);
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('batchReviewCategoryCustom').addEventListener('input', ()=>{
+  if(document.getElementById('batchReviewCategoryCustom').value.trim()){
+    batchReviewSelectedCategory='';
+    renderBatchReviewCategoryChips(null);
+  }
+});
+document.getElementById('batchReviewImages').addEventListener('change', ()=>{
+  const n = document.getElementById('batchReviewImages').files.length;
+  document.getElementById('batchReviewImagesNote').textContent = n ? n+' file(s) selected (PDF pages expand automatically)' : '';
+});
+
+async function advanceBatchReview(){
+  if(batchReviewIndex < batchReviewQueue.length-1){
+    batchReviewIndex++;
+    await showBatchReviewItem();
+  } else {
+    closeBatchReview();
+    await loadHymns(); renderLibrary(); renderHome();
+    toast(batchReviewAddedCount+' hymn(s) added');
+  }
+}
+document.getElementById('batchReviewSkip').addEventListener('click', advanceBatchReview);
+document.getElementById('batchReviewAdd').addEventListener('click', async ()=>{
+  const item = batchReviewQueue[batchReviewIndex];
+  const title = document.getElementById('batchReviewTitle').value.trim() || item.title || 'Untitled hymn';
+  const customCat = document.getElementById('batchReviewCategoryCustom').value.trim();
+  const category = customCat || batchReviewSelectedCategory || '';
+  if(customCat) await addCustomCategory(customCat);
+
+  const hymn = {
+    id: uid(), title, category, month:item.month, celebration:item.celebration, tags:[], favorite:false,
+    audioType:item.audioType, audioId:null, audioUrl:null, offlineId:null,
+    images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
+    stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  if(item.audioType==='file' && item.audioFile){
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob:item.audioFile});
+    hymn.audioId = mediaId;
+  } else {
+    hymn.audioUrl = item.audioUrl;
+  }
+
+  const imageFiles = Array.from(document.getElementById('batchReviewImages').files);
+  if(imageFiles.length){
+    const expanded = await expandLyricFiles(imageFiles);
+    for(const f of expanded){
       const mediaId = uid();
-      await dbPut('media', {id:mediaId, blob:file});
-      const hymn = {
-        id: uid(), title: filenameToTitle(file.name), category, month, celebration, tags:[], favorite:false,
-        audioType:'file', audioId:mediaId, audioUrl:null, offlineId:null,
-        images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
-        stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
-        createdAt: Date.now(), updatedAt: Date.now()
-      };
-      await dbPut('hymns', hymn);
-      count++;
+      await dbPut('media', {id:mediaId, blob:f});
+      hymn.images.push({id:mediaId, order:hymn.images.length});
     }
   }
 
-  document.getElementById('batchModalBackdrop').classList.remove('active');
-  await loadHymns();
-  renderLibrary();
-  renderHome();
-  toast(count+' hymn(s) added');
+  await dbPut('hymns', hymn);
+  batchReviewAddedCount++;
+  await advanceBatchReview();
 });
 
 /* ============================================================
@@ -2158,6 +2603,8 @@ async function exportAllData(){
   const a = document.createElement('a');
   a.href=url; a.download='yared-hymn-tracker-backup.json'; a.click();
   URL.revokeObjectURL(url);
+  await dbPut('meta', {key:'lastBackupAt', value: Date.now()});
+  renderHome();
 }
 function blobToDataUrl(blob){
   return new Promise((res,rej)=>{
@@ -2620,6 +3067,47 @@ document.querySelectorAll('.speed-pill').forEach(btn=>{
   btn.addEventListener('click', ()=> setPlaybackSpeed(parseFloat(btn.dataset.speed)));
 });
 setPlaybackSpeed(1);
+
+/* ============================================================
+   SLEEP TIMER — pauses playback after N minutes. Keeps counting
+   across hymn switches (it's about winding down your listening
+   session, not tied to any one hymn).
+   ============================================================ */
+let sleepTimerEndsAt = null;
+let sleepTimerInterval = null;
+function setSleepTimer(minutes){
+  clearInterval(sleepTimerInterval);
+  const statusEl = document.getElementById('sleepTimerStatus');
+  document.querySelectorAll('.sleep-pill').forEach(b=> b.classList.toggle('on', parseInt(b.dataset.mins)===minutes));
+  if(!minutes){
+    sleepTimerEndsAt = null;
+    statusEl.style.display='none';
+    return;
+  }
+  sleepTimerEndsAt = Date.now() + minutes*60000;
+  statusEl.style.display='block';
+  const tick = ()=>{
+    if(!sleepTimerEndsAt) return;
+    const remain = sleepTimerEndsAt - Date.now();
+    if(remain<=0){
+      audio.pause();
+      clearInterval(sleepTimerInterval);
+      sleepTimerEndsAt=null;
+      statusEl.style.display='none';
+      document.querySelectorAll('.sleep-pill').forEach(b=> b.classList.toggle('on', b.dataset.mins==='0'));
+      toast('Sleep timer — playback paused');
+      return;
+    }
+    const m = Math.floor(remain/60000), s = Math.floor((remain%60000)/1000);
+    statusEl.textContent = `Sleep timer: ${m}:${String(s).padStart(2,'0')} remaining`;
+  };
+  tick();
+  sleepTimerInterval = setInterval(tick, 1000);
+}
+document.querySelectorAll('.sleep-pill').forEach(btn=>{
+  btn.addEventListener('click', ()=> setSleepTimer(parseInt(btn.dataset.mins)));
+});
+setSleepTimer(0);
 
 /* ============================================================
    AB REPEAT (simple, top-level tab)
@@ -3093,6 +3581,7 @@ async function init(){
   renderLibrary();
   setupNativeNotificationBridge();
   hideNativeSplashScreen();
+  await loadReminderSettings();
 }
 /* Safety net: launchAutoHide (set in capacitor.config.json) already hides the
    splash automatically once the WebView is ready, with launchShowDuration:0

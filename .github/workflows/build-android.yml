@@ -40,23 +40,31 @@ jobs:
 
       - name: Add permissions to the manifest
         run: |
-          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application#' android/app/src/main/AndroidManifest.xml
 
-      - name: Register the background-playback service in the manifest
+      - name: Register the background-playback service, receivers, and widget in the manifest
         run: |
-          sed -i 's#</application>#    <service android:name=".PlaybackService" android:enabled="true" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n</application>#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#</application>#    <service android:name=".PlaybackService" android:enabled="true" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n    <receiver android:name=".ReminderReceiver" android:exported="false" />\n    <receiver android:name=".BootReceiver" android:exported="false">\n        <intent-filter>\n            <action android:name="android.intent.action.BOOT_COMPLETED" />\n        </intent-filter>\n    </receiver>\n    <receiver android:name=".DueHymnsWidgetProvider" android:exported="true">\n        <intent-filter>\n            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />\n        </intent-filter>\n        <meta-data android:name="android.appwidget.provider" android:resource="@xml/due_hymns_widget_info" />\n    </receiver>\n</application>#' android/app/src/main/AndroidManifest.xml
 
       - name: Add MediaStyle notification dependency
         run: |
           sed -i 's#dependencies {#dependencies {\n    implementation "androidx.media:media:1.7.0"#' android/app/build.gradle
 
-      - name: Copy native background-playback plugin into the project
+      - name: Copy native plugins, receivers, and widget into the project
         run: |
           mkdir -p android/app/src/main/java/com/yared/hymntracker
+          mkdir -p android/app/src/main/res/layout
+          mkdir -p android/app/src/main/res/xml
           cp native-templates/MainActivity.java android/app/src/main/java/com/yared/hymntracker/MainActivity.java
           cp native-templates/PlaybackService.java android/app/src/main/java/com/yared/hymntracker/PlaybackService.java
           cp native-templates/PlaybackNotificationPlugin.java android/app/src/main/java/com/yared/hymntracker/PlaybackNotificationPlugin.java
           cp native-templates/AudioFileSaverPlugin.java android/app/src/main/java/com/yared/hymntracker/AudioFileSaverPlugin.java
+          cp native-templates/ReminderPlugin.java android/app/src/main/java/com/yared/hymntracker/ReminderPlugin.java
+          cp native-templates/ReminderReceiver.java android/app/src/main/java/com/yared/hymntracker/ReminderReceiver.java
+          cp native-templates/BootReceiver.java android/app/src/main/java/com/yared/hymntracker/BootReceiver.java
+          cp native-templates/DueHymnsWidgetProvider.java android/app/src/main/java/com/yared/hymntracker/DueHymnsWidgetProvider.java
+          cp native-templates/res/layout/widget_due_hymns.xml android/app/src/main/res/layout/widget_due_hymns.xml
+          cp native-templates/res/xml/due_hymns_widget_info.xml android/app/src/main/res/xml/due_hymns_widget_info.xml
 
       - name: Build debug APK
         working-directory: android
