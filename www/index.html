@@ -102,10 +102,13 @@
   .bulk-bar{
     position:fixed; left:0; right:0; margin:0 auto; max-width:520px; bottom:0; z-index:29;
     background:var(--surface); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom));
-    display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 -4px 10px rgba(0,0,0,0.1);
+    box-shadow:0 -4px 10px rgba(0,0,0,0.1);
   }
   .bulk-bar.hidden{display:none;}
+  .bulk-bar-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
   .bulk-bar span{font-size:13px; font-weight:600; flex-shrink:0;}
+  .bulk-bar-actions{display:flex; gap:8px; overflow-x:auto; padding-bottom:2px;}
+  .bulk-bar-actions .btn{white-space:nowrap; flex-shrink:0;}
   .hymn-row.selectable{cursor:pointer;}
   .hymn-row .select-check{
     width:20px; height:20px; border-radius:6px; border:2px solid var(--line); flex-shrink:0;
@@ -472,11 +475,16 @@
     </section>
 
     <div class="bulk-bar hidden" id="bulkBar">
-      <span id="bulkCount">0 selected</span>
-      <div class="row" style="gap:8px;">
-        <button class="btn secondary" id="bulkSetCategory">Category</button>
-        <button class="btn danger" id="bulkDelete">Delete</button>
+      <div class="bulk-bar-header">
+        <span id="bulkCount">0 selected</span>
         <button class="btn ghost" id="bulkCancel">Cancel</button>
+      </div>
+      <div class="bulk-bar-actions">
+        <button class="btn secondary" id="bulkFavorite">♥ Favorite</button>
+        <button class="btn secondary" id="bulkQueue">+Q Queue</button>
+        <button class="btn secondary" id="bulkSetCategory">Category</button>
+        <button class="btn secondary" id="bulkShare">Share</button>
+        <button class="btn danger" id="bulkDelete">Delete</button>
       </div>
     </div>
 
@@ -1879,6 +1887,74 @@ document.getElementById('bulkSetCategory').addEventListener('click', async ()=>{
   renderHome();
   toast('Category updated');
 });
+document.getElementById('bulkFavorite').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  for(const id of selectedHymnIds){
+    const h = await dbGet('hymns', id);
+    if(h){ h.favorite = true; await dbPut('hymns', h); }
+  }
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Marked as favorite');
+});
+document.getElementById('bulkQueue').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const ids = await getPersistentQueue();
+  for(const id of selectedHymnIds){
+    if(!ids.includes(id)) ids.push(id);
+  }
+  await setPersistentQueue(ids);
+  toast('Added to queue');
+});
+document.getElementById('bulkShare').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const sharePlugin = getSharePlugin();
+  const ids = Array.from(selectedHymnIds);
+  if(!sharePlugin){
+    // Browser fallback: share a plain text list, since multi-file sharing needs the native plugin.
+    const titles = [];
+    for(const id of ids){ const h = await dbGet('hymns', id); if(h) titles.push(h.title); }
+    if(navigator.share){
+      try{ await navigator.share({title:'Hymns from Yared Hymn Tracker', text: titles.join('\n')}); }catch(e){}
+    } else {
+      toast('Sharing needs the installed app');
+    }
+    return;
+  }
+  toast('Preparing to share…');
+  const fsPlugin = getFilesystemPlugin();
+  const fileUris = [];
+  const linkUrls = [];
+  for(const id of ids){
+    const h = await dbGet('hymns', id);
+    if(!h) continue;
+    if(h.audioType==='link' && h.audioUrl){
+      linkUrls.push(`${h.title}: ${h.audioUrl}`);
+      continue;
+    }
+    let blob=null;
+    if(h.offlineId){ const rec=await dbGet('media', h.offlineId); blob=rec&&rec.blob; }
+    if(!blob && h.audioId){ const rec=await dbGet('media', h.audioId); blob=rec&&rec.blob; }
+    if(!blob || !fsPlugin) continue;
+    try{
+      const base64 = await blobToBase64(blob);
+      const ext = EXT_BY_MIME[blob.type] || 'mp3';
+      const writeRes = await fsPlugin.writeFile({path: sanitizeFilenamePart(h.title)+'.'+ext, data:base64, directory:'CACHE'});
+      fileUris.push(writeRes.uri);
+    }catch(e){}
+  }
+  try{
+    await sharePlugin.share({
+      title:'Hymns from Yared Hymn Tracker',
+      text: linkUrls.length ? linkUrls.join('\n') : undefined,
+      files: fileUris.length ? fileUris : undefined,
+      dialogTitle:'Share hymns'
+    });
+  }catch(e){
+    toast('Could not share: '+(e && e.message ? e.message : 'unknown error'));
+  }
+});
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtTime(sec){
@@ -2590,21 +2666,37 @@ function renderRecordingsList(){
    IMPORT / EXPORT (backup format specific to this app)
    ============================================================ */
 async function exportAllData(){
-  const allHymns = await dbGetAll('hymns');
-  const allMedia = await dbGetAll('media');
-  const mediaOut = [];
-  for(const m of allMedia){
-    const dataUrl = await blobToDataUrl(m.blob);
-    mediaOut.push({id:m.id, dataUrl});
+  try{
+    toast('Preparing backup…');
+    const allHymns = await dbGetAll('hymns');
+    const allMedia = await dbGetAll('media');
+    const mediaOut = [];
+    for(const m of allMedia){
+      const dataUrl = await blobToDataUrl(m.blob);
+      mediaOut.push({id:m.id, dataUrl});
+    }
+    const payload = {app:'yared-hymn-tracker', version:1, exportedAt:Date.now(), hymns:allHymns, media:mediaOut};
+    const jsonStr = JSON.stringify(payload);
+    const filename = 'yared-hymn-tracker-backup-'+new Date().toISOString().slice(0,10)+'.json';
+
+    const fsPlugin = getFilesystemPlugin();
+    const sharePlugin = getSharePlugin();
+    if(fsPlugin && sharePlugin){
+      const writeRes = await fsPlugin.writeFile({path:filename, data:jsonStr, directory:'CACHE', encoding:'utf8'});
+      await sharePlugin.share({title:'Yared Hymn Tracker backup', text:'Backup file', url:writeRes.uri, dialogTitle:'Save or share your backup'});
+    } else {
+      const blob = new Blob([jsonStr], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download=filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+    await dbPut('meta', {key:'lastBackupAt', value: Date.now()});
+    renderHome();
+    toast('Backup ready');
+  }catch(err){
+    toast('Export failed: '+(err && err.message ? err.message : 'unknown error'));
   }
-  const payload = {app:'yared-hymn-tracker', version:1, exportedAt:Date.now(), hymns:allHymns, media:mediaOut};
-  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download='yared-hymn-tracker-backup.json'; a.click();
-  URL.revokeObjectURL(url);
-  await dbPut('meta', {key:'lastBackupAt', value: Date.now()});
-  renderHome();
 }
 function blobToDataUrl(blob){
   return new Promise((res,rej)=>{

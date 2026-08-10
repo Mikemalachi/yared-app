@@ -31,6 +31,8 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
         SharedPreferences prefs = context.getSharedPreferences(PlaybackService.PREFS_NAME, Context.MODE_PRIVATE);
         String title = prefs.getString("nowPlayingTitle", "Yared Hymn Tracker");
         boolean playing = prefs.getBoolean("nowPlayingIsPlaying", false);
+        boolean modeActive = prefs.getBoolean("nowPlayingModeActive", false);
+        String statusText = prefs.getString("nowPlayingStatusText", "");
         int dueCount = prefs.getInt("dueCount", 0);
         String titlesJson = prefs.getString("dueTitles", "[]");
 
@@ -49,6 +51,12 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_due_hymns);
 
             views.setTextViewText(R.id.widget_title, title);
+            if (statusText != null && !statusText.isEmpty()) {
+                views.setTextViewText(R.id.widget_status, statusText);
+                views.setViewVisibility(R.id.widget_status, View.VISIBLE);
+            } else {
+                views.setViewVisibility(R.id.widget_status, View.GONE);
+            }
             views.setTextViewText(R.id.widget_due_summary, dueCount > 0 ? (dueCount + " hymn(s) due") : "Nothing due");
             views.setTextViewText(R.id.widget_play_pause, playing ? "\u275A\u275A" : "\u25B6");
 
@@ -60,6 +68,19 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
                 } else {
                     views.setViewVisibility(dueIds[i], View.GONE);
                 }
+            }
+
+            // Mode-aware controls: mirrors the notification — when a practice
+            // mode (AB Repeat / Teacher / Continuous) is active, show a second
+            // prev/next pair for stepping through the current segment/review.
+            if (modeActive) {
+                views.setViewVisibility(R.id.widget_mode_prev, View.VISIBLE);
+                views.setViewVisibility(R.id.widget_mode_next, View.VISIBLE);
+                views.setOnClickPendingIntent(R.id.widget_mode_prev, actionIntent(context, PlaybackService.ACTION_MODE_PREV));
+                views.setOnClickPendingIntent(R.id.widget_mode_next, actionIntent(context, PlaybackService.ACTION_MODE_NEXT));
+            } else {
+                views.setViewVisibility(R.id.widget_mode_prev, View.GONE);
+                views.setViewVisibility(R.id.widget_mode_next, View.GONE);
             }
 
             views.setOnClickPendingIntent(R.id.widget_prev, actionIntent(context, PlaybackService.ACTION_PREV));

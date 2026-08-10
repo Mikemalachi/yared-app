@@ -18,6 +18,17 @@
         android:ellipsize="end" />
 
     <TextView
+        android:id="@+id/widget_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#7A2E2E"
+        android:textSize="11sp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/widget_due_summary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -73,6 +84,16 @@
             android:background="@android:color/transparent" />
 
         <Button
+            android:id="@+id/widget_mode_prev"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="\u23EA"
+            android:textColor="#2B2118"
+            android:background="@android:color/transparent"
+            android:visibility="gone" />
+
+        <Button
             android:id="@+id/widget_play_pause"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -80,6 +101,16 @@
             android:text="\u25B6"
             android:textColor="#7A2E2E"
             android:background="@android:color/transparent" />
+
+        <Button
+            android:id="@+id/widget_mode_next"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="\u23E9"
+            android:textColor="#2B2118"
+            android:background="@android:color/transparent"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/widget_next"

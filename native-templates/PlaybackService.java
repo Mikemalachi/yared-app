@@ -99,6 +99,8 @@ public class PlaybackService extends Service {
         prefs.edit()
             .putString("nowPlayingTitle", currentTitle)
             .putBoolean("nowPlayingIsPlaying", isPlaying)
+            .putBoolean("nowPlayingModeActive", modeActive)
+            .putString("nowPlayingStatusText", statusText)
             .apply();
     }
 
