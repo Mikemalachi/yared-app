@@ -100,9 +100,9 @@
   nav.tabbar button.active{color:var(--gold-bright); background:rgba(217,167,65,0.12);}
 
   .bulk-bar{
-    position:fixed; left:0; right:0; margin:0 auto; max-width:520px; bottom:0; z-index:29;
-    background:var(--surface); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom));
-    box-shadow:0 -4px 10px rgba(0,0,0,0.1);
+    position:fixed; left:0; right:0; margin:0 auto; max-width:520px; top:0; z-index:35;
+    background:var(--surface); border-bottom:1px solid var(--line); padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
   }
   .bulk-bar.hidden{display:none;}
   .bulk-bar-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}

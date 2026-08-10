@@ -10,8 +10,6 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.view.View;
 import android.widget.RemoteViews;
-import org.json.JSONArray;
-import org.json.JSONException;
 
 public class DueHymnsWidgetProvider extends AppWidgetProvider {
 
@@ -34,18 +32,6 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
         boolean modeActive = prefs.getBoolean("nowPlayingModeActive", false);
         String statusText = prefs.getString("nowPlayingStatusText", "");
         int dueCount = prefs.getInt("dueCount", 0);
-        String titlesJson = prefs.getString("dueTitles", "[]");
-
-        String[] dueTitles;
-        try {
-            JSONArray arr = new JSONArray(titlesJson);
-            dueTitles = new String[arr.length()];
-            for (int i = 0; i < arr.length(); i++) {
-                dueTitles[i] = arr.optString(i);
-            }
-        } catch (JSONException e) {
-            dueTitles = new String[0];
-        }
 
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_due_hymns);
@@ -59,16 +45,6 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
             }
             views.setTextViewText(R.id.widget_due_summary, dueCount > 0 ? (dueCount + " hymn(s) due") : "Nothing due");
             views.setTextViewText(R.id.widget_play_pause, playing ? "\u275A\u275A" : "\u25B6");
-
-            int[] dueIds = new int[]{ R.id.widget_due_1, R.id.widget_due_2, R.id.widget_due_3 };
-            for (int i = 0; i < dueIds.length; i++) {
-                if (i < dueTitles.length && dueTitles[i] != null && !dueTitles[i].isEmpty()) {
-                    views.setTextViewText(dueIds[i], "\u2022 " + dueTitles[i]);
-                    views.setViewVisibility(dueIds[i], View.VISIBLE);
-                } else {
-                    views.setViewVisibility(dueIds[i], View.GONE);
-                }
-            }
 
             // Mode-aware controls: mirrors the notification — when a practice
             // mode (AB Repeat / Teacher / Continuous) is active, show a second
