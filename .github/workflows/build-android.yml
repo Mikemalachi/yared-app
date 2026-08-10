@@ -66,11 +66,25 @@ jobs:
           cp native-templates/res/layout/widget_due_hymns.xml android/app/src/main/res/layout/widget_due_hymns.xml
           cp native-templates/res/xml/due_hymns_widget_info.xml android/app/src/main/res/xml/due_hymns_widget_info.xml
 
+      - name: Add Maven Central mirror fallback
+        run: |
+          sed -i "s#mavenCentral()#mavenCentral()\n        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }#g" android/build.gradle
+
       - name: Build debug APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          n=0
+          until [ $n -ge 3 ]; do
+            ./gradlew assembleDebug --no-daemon && break
+            n=$((n+1))
+            echo "Build attempt $n failed (often a transient Maven Central CDN issue) — retrying in 30s..."
+            sleep 30
+          done
+          if [ $n -ge 3 ]; then
+            echo "Build failed after 3 attempts"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
