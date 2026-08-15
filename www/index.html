@@ -709,6 +709,10 @@
             <button data-target="contRepeats" data-d="1">+</button>
           </div>
         </div>
+        <div class="card" id="contEstimateBox" style="padding:10px 12px; margin-bottom:10px;">
+          <div style="font-size:12px; color:var(--ink-soft);">Estimated time to go through the whole hymn</div>
+          <div style="font-size:16px; font-weight:700; font-family:Georgia,serif; margin-top:2px;" id="contEstimateValue">—</div>
+        </div>
         <div class="row" style="margin-bottom:8px;">
           <button class="btn block" id="startContinuous" style="flex:1;">Start</button>
           <button class="btn secondary" id="stopContinuous" style="flex:1;">Stop</button>
@@ -1186,8 +1190,13 @@ async function saveHymnFromForm(){
   hymn.tags = tags;
   hymn.updatedAt = Date.now();
 
+  hymn.loops = hymn.loops||[];
+  hymn.recordings = hymn.recordings||[];
+
+  let linkJustSet = false;
   if(audioSourceMode==='link'){
     if(audioLink){
+      linkJustSet = hymn.audioUrl!==audioLink || !hymn.offlineId;
       hymn.audioType='link';
       hymn.audioUrl=audioLink;
       hymn.audioId=null;
@@ -1202,8 +1211,6 @@ async function saveHymnFromForm(){
     hymn.audioUrl=null;
     hymn.duration = 0; // will be detected on next load
   }
-  hymn.loops = hymn.loops||[];
-  hymn.recordings = hymn.recordings||[];
 
   if(imageFiles.length){
     const expanded = await expandLyricFiles(imageFiles);
@@ -1220,6 +1227,9 @@ async function saveHymnFromForm(){
   renderLibrary();
   renderHome();
   toast('Saved');
+  if(linkJustSet){
+    downloadOffline(hymn.id); // fire-and-forget; shows its own toasts
+  }
 }
 
 async function deleteHymnById(id){
@@ -1243,11 +1253,13 @@ let wizardIndex = 0;
 let wizardAudioSourceMode='file';
 let wizardSelectedCategory='';
 let wizardPreviewUrl=null;
+let wizardIncomingFile=null; // set when the app was opened "with" an audio file from outside
 
 function openAddWizard(){
   wizardIndex = 0;
   wizardSelectedCategory='';
   wizardAudioSourceMode='file';
+  wizardIncomingFile=null;
   document.getElementById('wAudio').value='';
   document.getElementById('wAudioLink').value='';
   document.getElementById('wAudioPreview').removeAttribute('src');
@@ -1264,9 +1276,25 @@ function openAddWizard(){
   showWizardStep(0);
   document.getElementById('addWizardBackdrop').classList.add('active');
 }
+/* Opens the Add wizard pre-loaded with a file handed to the app from
+   outside (via "Open with" or a share target) — audio input can't be
+   set programmatically for security reasons, so we keep the File in
+   wizardIncomingFile and saveWizardHymn uses that instead when present. */
+function openAddWizardWithFile(file){
+  openAddWizard();
+  wizardIncomingFile = file;
+  setWizardSourceMode('file');
+  if(wizardPreviewUrl){ URL.revokeObjectURL(wizardPreviewUrl); wizardPreviewUrl=null; }
+  wizardPreviewUrl = URL.createObjectURL(file);
+  document.getElementById('wAudioPreview').src = wizardPreviewUrl;
+  document.getElementById('wTitle').value = filenameToTitle(file.name);
+  toast('Audio loaded — finish setting it up below');
+  showWizardStep(1);
+}
 function closeWizard(){
   document.getElementById('addWizardBackdrop').classList.remove('active');
   document.getElementById('wAudioPreview').pause();
+  wizardIncomingFile=null;
   if(wizardPreviewUrl){ URL.revokeObjectURL(wizardPreviewUrl); wizardPreviewUrl=null; }
 }
 document.getElementById('closeWizard').addEventListener('click', closeWizard);
@@ -1381,9 +1409,9 @@ async function saveWizardHymn(){
 
   if(wizardAudioSourceMode==='link' && audioLink){
     hymn.audioType='link'; hymn.audioUrl=audioLink;
-  } else if(audioFile){
+  } else if(audioFile || wizardIncomingFile){
     const mediaId = uid();
-    await dbPut('media', {id:mediaId, blob:audioFile});
+    await dbPut('media', {id:mediaId, blob: audioFile || wizardIncomingFile});
     hymn.audioType='file'; hymn.audioId=mediaId;
   }
   const expandedImages = await expandLyricFiles(imageFiles);
@@ -1399,6 +1427,9 @@ async function saveWizardHymn(){
   renderLibrary();
   renderHome();
   toast('Hymn added');
+  if(hymn.audioType==='link' && hymn.audioUrl){
+    downloadOffline(hymn.id); // fire-and-forget so it doesn't block the UI; shows its own toasts
+  }
 }
 
 let audioSourceMode='file';
@@ -2528,6 +2559,9 @@ document.getElementById('batchReviewAdd').addEventListener('click', async ()=>{
 
   await dbPut('hymns', hymn);
   batchReviewAddedCount++;
+  if(hymn.audioType==='link' && hymn.audioUrl){
+    downloadOffline(hymn.id); // fire-and-forget, runs in the background while reviewing continues
+  }
   await advanceBatchReview();
 });
 
@@ -2812,6 +2846,7 @@ async function buildPlayerShell(h){
   renderLoopsList();
   renderRecordingsList();
   renderStatusRow();
+  if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
   if(typeof positionPinnedBlock==='function'){
     pinnedEl.classList.remove('compact');
     positionPinnedBlock();
@@ -2928,6 +2963,7 @@ audio.addEventListener('loadedmetadata', async ()=>{
     currentHymn.duration = audio.duration;
     await dbPut('hymns', currentHymn);
   }
+  if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
 });
 audio.addEventListener('timeupdate', ()=>{
   updatePlaybackUI();
@@ -3250,7 +3286,10 @@ function stepper(id, delta){
   input.value = Math.max(min, (parseFloat(input.value)||0)+delta);
 }
 document.querySelectorAll('.num-stepper button').forEach(btn=>{
-  btn.addEventListener('click', ()=> stepper(btn.dataset.target, parseInt(btn.dataset.d)));
+  btn.addEventListener('click', ()=>{
+    stepper(btn.dataset.target, parseInt(btn.dataset.d));
+    if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
+  });
 });
 
 /* ============================================================
@@ -3305,10 +3344,10 @@ function updateAbFieldDisplay(pane){
 }
 ['teacher','continuous'].forEach(pane=>{
   const cfg = paneCfg[pane];
-  document.getElementById(cfg.defaultBtn).addEventListener('click', ()=>setSubModeFor(pane,'default'));
-  document.getElementById(cfg.abBtn).addEventListener('click', ()=>setSubModeFor(pane,'ab'));
-  document.getElementById(cfg.setA).addEventListener('click', ()=>{ abStoreFor(pane).a=audio.currentTime; updateAbFieldDisplay(pane); });
-  document.getElementById(cfg.setB).addEventListener('click', ()=>{ abStoreFor(pane).b=audio.currentTime; updateAbFieldDisplay(pane); });
+  document.getElementById(cfg.defaultBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'default'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.abBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'ab'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.setA).addEventListener('click', ()=>{ abStoreFor(pane).a=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.setB).addEventListener('click', ()=>{ abStoreFor(pane).b=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
 });
 
 function readPaneConfig(pane){
@@ -3375,6 +3414,59 @@ function startFromBeginning(pane){
 }
 function contReviewEnabled(){ return document.getElementById('contReviewEnabled').checked; }
 function getContReviewEveryN(){ return parseInt(document.getElementById('contReviewEveryN').value)||1; }
+
+/* Estimated total time for a full Continuous Mode run, computed by
+   simulating the exact same segment/review math the engine itself
+   uses (see advanceSegmentReal/advanceSegmentAuto below) — not a rough
+   guess. Updates live as any field changes. */
+function fmtDurationLong(totalSeconds){
+  totalSeconds = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(totalSeconds/3600);
+  const m = Math.floor((totalSeconds%3600)/60);
+  const s = totalSeconds%60;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+function calcContinuousEstimateSeconds(){
+  if(!audio.duration || !isFinite(audio.duration)) return null;
+  let segStart, segLength;
+  if(contSubMode==='ab'){
+    if(contAB.a==null || contAB.b==null || contAB.b<=contAB.a) return null;
+    segStart = contAB.a; segLength = contAB.b-contAB.a;
+  } else {
+    segLength = parseFloat(document.getElementById('contDuration').value)||0;
+    if(segLength<=0) return null;
+    segStart = audio.currentTime||0;
+  }
+  const extraSecs = parseFloat(document.getElementById('contExtraSecs').value)||0;
+  const repeatCount = parseInt(document.getElementById('contRepeats').value)||1;
+  const reviewEnabled = contReviewEnabled();
+  const reviewEveryN = getContReviewEveryN();
+  const beginningPoint = contBeginningPoint!=null ? contBeginningPoint : 0;
+  const cost = (len)=> repeatCount*(2*len+extraSecs);
+
+  let total=0, curStart=segStart, segsSinceReview=0, guard=0;
+  while(curStart+segLength <= audio.duration+0.05 && guard<20000){
+    guard++;
+    total += cost(segLength);
+    segsSinceReview++;
+    if(reviewEnabled && segsSinceReview>=reviewEveryN){
+      segsSinceReview=0;
+      const reviewLen = (curStart+segLength) - beginningPoint;
+      if(reviewLen>0) total += cost(reviewLen);
+    }
+    curStart += segLength;
+  }
+  return total;
+}
+function updateContinuousEstimate(){
+  const box = document.getElementById('contEstimateValue');
+  if(!box) return;
+  const secs = calcContinuousEstimateSeconds();
+  box.textContent = secs==null ? '—' : fmtDurationLong(secs);
+}
+
 function teacherReviewEnabled(){ return document.getElementById('teacherReviewEnabled').checked; }
 function getTeacherReviewEveryN(){ return parseInt(document.getElementById('teacherReviewEveryN').value)||1; }
 
@@ -3543,6 +3635,11 @@ document.getElementById('contPrevBtn').addEventListener('click', ()=>prevSegment
 document.getElementById('contSetBeginningBtn').addEventListener('click', ()=>{
   contBeginningPoint = audio.currentTime;
   document.getElementById('contBeginningVal').textContent = fmtTime(contBeginningPoint);
+  updateContinuousEstimate();
+});
+document.getElementById('contReviewEnabled').addEventListener('change', updateContinuousEstimate);
+['contDuration','contExtraSecs','contRepeats','contReviewEveryN'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateContinuousEstimate);
 });
 
 /* ============================================================
@@ -3554,6 +3651,7 @@ document.querySelectorAll('.subtabs button').forEach(btn=>{
     document.querySelectorAll('.subpane').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.pane).classList.add('active');
+    if(btn.dataset.pane==='pane-continuous' && typeof updateContinuousEstimate==='function') updateContinuousEstimate();
   });
 });
 
@@ -3674,6 +3772,7 @@ async function init(){
   setupNativeNotificationBridge();
   hideNativeSplashScreen();
   await loadReminderSettings();
+  await checkIncomingAudio();
 }
 /* Safety net: launchAutoHide (set in capacitor.config.json) already hides the
    splash automatically once the WebView is ready, with launchShowDuration:0
@@ -3687,6 +3786,32 @@ function hideNativeSplashScreen(){
     }
   }catch(e){}
 }
+
+/* ============================================================
+   INCOMING AUDIO — picks up a file the app was opened "with" from a
+   file manager, or shared to it from another app, and feeds it
+   straight into the Add wizard. Checked on cold start and again
+   whenever the app comes back to the foreground, since Android can
+   deliver a fresh "open with" intent while the app is already running.
+   ============================================================ */
+async function checkIncomingAudio(){
+  try{
+    if(!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.IncomingAudio)) return;
+    const res = await window.Capacitor.Plugins.IncomingAudio.getPendingAudio();
+    if(!res || !res.data) return;
+    const byteChars = atob(res.data);
+    const byteNumbers = new Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++) byteNumbers[i]=byteChars.charCodeAt(i);
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], {type: res.mimeType||'audio/mpeg'});
+    const file = new File([blob], res.filename||'Untitled.mp3', {type: res.mimeType||'audio/mpeg'});
+    openAddWizardWithFile(file);
+  }catch(e){}
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible') checkIncomingAudio();
+});
+
 init();
 
 })();

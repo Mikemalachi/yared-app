@@ -46,6 +46,10 @@ jobs:
         run: |
           sed -i 's#</application>#    <service android:name=".PlaybackService" android:enabled="true" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n    <receiver android:name=".ReminderReceiver" android:exported="false" />\n    <receiver android:name=".BootReceiver" android:exported="false">\n        <intent-filter>\n            <action android:name="android.intent.action.BOOT_COMPLETED" />\n        </intent-filter>\n    </receiver>\n    <receiver android:name=".DueHymnsWidgetProvider" android:exported="true">\n        <intent-filter>\n            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />\n        </intent-filter>\n        <meta-data android:name="android.appwidget.provider" android:resource="@xml/due_hymns_widget_info" />\n    </receiver>\n</application>#' android/app/src/main/AndroidManifest.xml
 
+      - name: Register as an audio file handler ("Open with" / share target)
+        run: |
+          sed -i 's#</activity>#            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:mimeType="audio/*" />\n            </intent-filter>\n            <intent-filter>\n                <action android:name="android.intent.action.SEND" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="audio/*" />\n            </intent-filter>\n        </activity>#' android/app/src/main/AndroidManifest.xml
+
       - name: Add MediaStyle notification dependency
         run: |
           sed -i 's#dependencies {#dependencies {\n    implementation "androidx.media:media:1.7.0"#' android/app/build.gradle
@@ -63,6 +67,7 @@ jobs:
           cp native-templates/ReminderReceiver.java android/app/src/main/java/com/yared/hymntracker/ReminderReceiver.java
           cp native-templates/BootReceiver.java android/app/src/main/java/com/yared/hymntracker/BootReceiver.java
           cp native-templates/DueHymnsWidgetProvider.java android/app/src/main/java/com/yared/hymntracker/DueHymnsWidgetProvider.java
+          cp native-templates/IncomingAudioPlugin.java android/app/src/main/java/com/yared/hymntracker/IncomingAudioPlugin.java
           cp native-templates/res/layout/widget_due_hymns.xml android/app/src/main/res/layout/widget_due_hymns.xml
           cp native-templates/res/xml/due_hymns_widget_info.xml android/app/src/main/res/xml/due_hymns_widget_info.xml
 

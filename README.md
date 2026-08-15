@@ -26,8 +26,12 @@ GitHub's own cloud servers.
    - `DueHymnsWidgetProvider.java` + `res/layout/widget_due_hymns.xml` +
      `res/xml/due_hymns_widget_info.xml` — a home screen widget showing
      up to 3 due hymn titles plus play/pause/next/previous controls.
-   - `MainActivity.java` — registers all of the above and requests the
-     microphone + notification permissions on first launch.
+   - `MainActivity.java` — registers all of the above, requests the
+     microphone + notification permissions on first launch, and
+     captures audio files handed to the app via "Open with" from a
+     file manager or a share sheet.
+   - `IncomingAudioPlugin.java` — holds that captured audio for the
+     JS side to pick up and feed straight into the Add wizard.
 4. `.github/workflows/build-android.yml` runs on every push to `main`
    (or manually via **Run workflow**) and, entirely on GitHub's
    servers:
