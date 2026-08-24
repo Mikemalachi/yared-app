@@ -1,0 +1,4310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Yared Hymn Tracker</title>
+<style>
+  :root{
+    --parchment:#F6EED9;
+    --parchment-dim:#EDE1C4;
+    --ink:#2B2118;
+    --ink-soft:#5A4B3A;
+    --gold:#B8862B;
+    --gold-bright:#D9A741;
+    --maroon:#7A2E2E;
+    --sage:#5F7A5E;
+    --line:#D9C79E;
+    --surface:#ffffff;
+    --shadow:0 4px 14px rgba(43,33,24,0.12);
+    --radius:14px;
+  }
+  body.dark{
+    --parchment:#0A0E1C;
+    --parchment-dim:#131B33;
+    --ink:#E8ECF7;
+    --ink-soft:#8B93B8;
+    --gold:#E8BE6B;
+    --gold-bright:#F2CE7C;
+    --maroon:#B5567E;
+    --sage:#6FA8A0;
+    --line:#242E4E;
+    --surface:#101830;
+    --shadow:0 4px 18px rgba(0,0,0,0.5);
+  }
+  body.dark .lyric-frame{background:#fff;}
+  body.dark{
+    background-image:
+      radial-gradient(1.6px 1.6px at 12% 8%, rgba(255,255,255,0.9), transparent),
+      radial-gradient(1px 1px at 28% 22%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1.4px 1.4px at 46% 6%, rgba(255,255,255,0.75), transparent),
+      radial-gradient(1px 1px at 63% 18%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1.8px 1.8px at 80% 10%, rgba(255,255,255,0.85), transparent),
+      radial-gradient(1px 1px at 92% 26%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.3px 1.3px at 8% 42%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 35% 52%, rgba(255,255,255,0.45), transparent),
+      radial-gradient(1.6px 1.6px at 55% 46%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 72% 58%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.4px 1.4px at 88% 48%, rgba(255,255,255,0.65), transparent),
+      radial-gradient(1px 1px at 18% 72%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.2px 1.2px at 42% 82%, rgba(255,255,255,0.55), transparent),
+      radial-gradient(1px 1px at 65% 90%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1.5px 1.5px at 95% 80%, rgba(255,255,255,0.6), transparent);
+    background-repeat: repeat;
+    background-size: 340px 340px;
+    background-attachment: fixed;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--parchment); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    overscroll-behavior:none; transition:background .2s ease, color .2s ease; color-scheme:light;
+  }
+  body.dark{color-scheme:dark;}
+  h1,h2,h3,.serif{font-family:Georgia,'Noto Serif Ethiopic','Times New Roman',serif;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  #app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; position:relative; background:var(--parchment);}
+
+  /* Header */
+  header.topbar{
+    padding:18px 18px 14px; position:sticky; top:0; z-index:20;
+    background:linear-gradient(var(--parchment) 82%, transparent);
+  }
+  header.topbar h1{font-size:20px; margin:0; letter-spacing:.3px;}
+  header.topbar .rule{height:2px; width:38px; background:var(--gold); margin-top:8px; border-radius:2px;}
+  header.topbar .sub{font-size:12px; color:var(--ink-soft); margin-top:6px;}
+  #app.player-mode header.topbar{display:none;}
+
+  main{flex:1; padding:0 16px 170px; overflow-y:auto;}
+
+  /* Screens */
+  .screen{display:none;}
+  .screen.active{display:block; animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+
+  /* Bottom nav */
+  nav.tabbar{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    max-width:520px; margin:0 auto;
+    background:#1C1712; display:flex; padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+    border-radius:18px 18px 0 0;
+  }
+  nav.tabbar button{
+    flex:1; background:none; border:none; color:#C9BCA4; font-size:11px;
+    display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 4px; border-radius:10px;
+  }
+  nav.tabbar button .ic{font-size:18px;}
+  nav.tabbar button.active{color:var(--gold-bright); background:rgba(217,167,65,0.12);}
+
+  .bulk-bar{
+    position:fixed; left:0; right:0; margin:0 auto; max-width:520px; top:0; z-index:35;
+    background:var(--surface); border-bottom:1px solid var(--line); padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+  }
+  .bulk-bar.hidden{display:none;}
+  .bulk-bar-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .bulk-bar span{font-size:13px; font-weight:600; flex-shrink:0;}
+  .bulk-bar-actions{display:flex; gap:8px; overflow-x:auto; padding-bottom:2px;}
+  .bulk-bar-actions .btn{white-space:nowrap; flex-shrink:0;}
+  .hymn-row.selectable{cursor:pointer;}
+  .hymn-row .select-check{
+    width:20px; height:20px; border-radius:6px; border:2px solid var(--line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:transparent;
+  }
+  .hymn-row .select-check.checked{background:var(--gold); border-color:var(--gold); color:#fff;}
+
+  .mini-player{
+    position:fixed; left:0; right:0; margin:0 auto; max-width:520px;
+    z-index:28; background:var(--surface); border-top:1px solid var(--line);
+    box-shadow:0 -4px 10px rgba(0,0,0,0.1); border-radius:12px 12px 0 0; overflow:hidden;
+  }
+  .mini-player.hidden{display:none;}
+  .mini-seek{height:28px; display:flex; align-items:center; padding:0 4px; cursor:pointer; touch-action:none;}
+  .mini-seek-track{width:100%; height:4px; background:var(--parchment-dim); border-radius:2px; position:relative; overflow:visible;}
+  .mini-seek-fill{height:100%; background:var(--gold); width:0%; pointer-events:none; border-radius:2px;}
+  .mini-seek-handle{
+    position:absolute; top:50%; left:0%; width:14px; height:14px; margin:-7px 0 0 -7px;
+    border-radius:50%; background:var(--gold); box-shadow:var(--shadow); pointer-events:none;
+  }
+  .mini-player-row{display:flex; align-items:center; gap:10px; padding:8px 14px;}
+  .mini-player .thumb{
+    width:32px; height:32px; border-radius:8px; background:var(--gold); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; cursor:pointer;
+  }
+  .mini-player .info{flex:1; min-width:0; cursor:pointer;}
+  .mini-player .info .t{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--ink);}
+  .mini-player .controls{display:flex; align-items:center; gap:10px;}
+  .mini-player .controls button{background:none; border:none; font-size:19px; color:var(--ink); padding:4px;}
+  .mini-player .controls .mp-play{font-size:24px;}
+
+  /* Cards */
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px; margin-bottom:12px; box-shadow:var(--shadow);
+  }
+  .section-title{font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-soft); margin:22px 0 10px;}
+  .section-title:first-child{margin-top:4px;}
+
+  .hymn-row{
+    display:flex; align-items:center; gap:12px; padding:12px; background:var(--surface);
+    border:1px solid var(--line); border-radius:12px; margin-bottom:8px;
+  }
+  .hymn-row .thumb{
+    width:42px; height:42px; border-radius:8px; background:var(--gold);
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; flex-shrink:0;
+  }
+  .hymn-row .meta{flex:1; min-width:0;}
+  .hymn-row .meta .t{font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .hymn-row .meta .s{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .hymn-row .fav{background:none; border:none; font-size:18px; padding:4px; color:var(--line);}
+  .hymn-row .fav.on{color:var(--maroon);}
+
+  .btn{
+    border:none; border-radius:10px; padding:11px 16px; font-size:14px; font-weight:600;
+    background:var(--gold); color:#fff;
+  }
+  .btn.secondary{background:var(--parchment-dim); color:var(--ink);}
+  .btn.ghost{background:none; color:var(--ink-soft); font-weight:500;}
+  .btn.danger{background:var(--maroon); color:#fff;}
+  .btn.block{width:100%; display:block;}
+  .btn:disabled{opacity:.45;}
+
+  .row{display:flex; gap:8px;}
+  .streak-badge{
+    display:inline-flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--line);
+    border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600; margin-bottom:14px; color:var(--ink);
+  }
+
+  .chip{
+    display:inline-block; padding:6px 12px; border-radius:20px; font-size:12.5px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); margin:0 6px 6px 0;
+  }
+  .chip.active{background:var(--ink); color:var(--gold-bright); border-color:var(--ink);}
+
+  input[type=text],input[type=search],textarea,select{
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--surface); font-size:14px; margin-bottom:10px;
+  }
+  label{font-size:12px; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:4px;}
+
+  .fab{
+    position:fixed; bottom:88px; right:calc(50% - 260px + 18px); z-index:25;
+    width:52px; height:52px; border-radius:50%; background:var(--maroon); color:#fff;
+    border:none; font-size:26px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+  }
+  @media (max-width:560px){ .fab{right:18px;} }
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(43,33,24,0.5); z-index:50; display:none;
+    align-items:flex-end; justify-content:center;
+  }
+  .modal-backdrop.active{display:flex;}
+  .modal{
+    background:var(--parchment); width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
+    border-radius:20px 20px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  }
+  .modal h2{margin:0 0 14px; font-size:18px;}
+  .modal-close{float:right; background:none; border:none; font-size:20px; color:var(--ink-soft);}
+
+  /* Player */
+  .player-screen{padding-top:2px;}
+  .player-sticky-top{
+    position:relative; background:var(--parchment);
+    margin:0 -16px; padding:6px 16px 6px;
+    transition:padding .15s ease;
+  }
+  .player-sticky-top.pinned{
+    position:fixed; left:0; right:0; margin:0 auto; max-width:520px;
+    z-index:25; box-shadow:0 8px 10px -8px rgba(43,33,24,0.2);
+  }
+  .player-sticky-top.compact .hymn-title-block{display:none;}
+  .player-sticky-top.compact .lyric-frame{max-height:11vh;}
+  .player-sticky-top.compact .fine-seek-label{display:none;}
+  .player-sticky-top.compact .fine-seek-track{height:22px;}
+  .player-sticky-top.compact .fine-seek-handle{height:16px; top:2px;}
+  .player-sticky-top.compact .page-controls{margin-top:4px;}
+  .lyric-frame{
+    position:relative; width:100%; aspect-ratio:3/4; max-height:26vh; background:var(--surface); border-radius:var(--radius);
+    overflow:hidden; border:1px solid var(--line); touch-action:none; margin:0 auto; transition:max-height .15s ease;
+  }
+  .lyric-frame .page{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  }
+  .lyric-frame .page.visible{display:flex;}
+  .lyric-frame .page img{
+    max-width:100%; max-height:100%; will-change:transform; transform-origin:center center;
+    user-select:none; -webkit-user-drag:none;
+  }
+  .lyric-frame .empty-msg{color:var(--ink-soft); font-size:13px; text-align:center; padding:20px;}
+  .page-controls{display:flex; align-items:center; justify-content:space-between; margin-top:6px;}
+  .page-controls .p-info{font-size:11.5px; color:var(--ink-soft);}
+  .icon-btn{
+    background:var(--parchment-dim); border:1px solid var(--line); border-radius:8px;
+    width:30px; height:30px; font-size:14px; display:flex; align-items:center; justify-content:center;
+  }
+
+  .hymn-title-block{margin:2px 0 4px;}
+  .hymn-title-block .title-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .hymn-title-block h2{margin:0; font-size:14.5px; font-weight:600; flex:1; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .hymn-title-block .rule{display:none;}
+  #pinToggleBtn, #focusModeBtn, .title-row #pageReset{flex-shrink:0; width:28px; height:28px; font-size:13px;}
+  #pinToggleBtn.on, #focusModeBtn.on{background:var(--gold); color:#fff; border-color:var(--gold);}
+
+  /* Focus mode: hide everything below the "now playing" block, and make
+     that block span the full screen as a flex column — the lyric grows
+     to fill remaining space, seek/transport controls sit at the bottom. */
+  #screen-player.focus-mode .toggle-row,
+  #screen-player.focus-mode #sleepTimerStatus,
+  #screen-player.focus-mode #openPlaybackOptions,
+  #screen-player.focus-mode .status-row,
+  #screen-player.focus-mode #practiceStatus,
+  #screen-player.focus-mode .subtabs,
+  #screen-player.focus-mode .subpane,
+  #screen-player.focus-mode > .section-title{
+    display:none !important;
+  }
+  #screen-player.focus-mode #playerStickySpacer{ display:none; }
+  #screen-player.focus-mode .player-sticky-top{
+    position:fixed; left:0; right:0; top:0; bottom:0; margin:0 auto; max-width:520px;
+    display:flex; flex-direction:column; z-index:25; background:var(--parchment);
+    padding:calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 10px);
+  }
+  #screen-player.focus-mode .lyric-frame{
+    flex:1 1 auto; max-height:none; aspect-ratio:unset; min-height:0;
+  }
+  #screen-player.focus-mode .hymn-title-block,
+  #screen-player.focus-mode .page-controls,
+  #screen-player.focus-mode .fine-seek-wrap,
+  #screen-player.focus-mode .seek-wrap,
+  #screen-player.focus-mode .transport{
+    flex-shrink:0;
+  }
+
+  .seek-wrap{margin:14px 0 6px;}
+  input[type=range]{width:100%; accent-color:var(--gold);}
+  .time-row{display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-soft);}
+
+  .transport{display:flex; align-items:center; justify-content:center; gap:18px; margin:10px 0 4px;}
+  .transport .play{
+    width:60px; height:60px; border-radius:50%; background:var(--maroon); color:#fff; border:none; font-size:24px;
+  }
+  .transport .side{width:44px; height:44px; border-radius:50%; background:none; border:none; font-size:20px; color:var(--ink);}
+  .toggle-row{display:flex; gap:10px; justify-content:center; margin:10px 0 18px; flex-wrap:wrap;}
+  .toggle-pill{
+    padding:8px 14px; border-radius:20px; border:1px solid var(--line); background:var(--surface); font-size:12.5px; color:var(--ink-soft);
+  }
+  .toggle-pill.on{background:var(--sage); color:#fff; border-color:var(--sage);}
+
+  .subtabs{display:flex; gap:6px; margin:16px 0 12px; background:var(--parchment-dim); padding:4px; border-radius:12px;}
+  .subtabs button{flex:1; background:none; border:none; padding:9px; border-radius:9px; font-size:12.5px; color:var(--ink-soft); font-weight:600;}
+  .subtabs button.active{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .subpane{display:none;}
+  .subpane.active{display:block;}
+
+  .field-inline{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+  .field-inline label{margin:0; flex:1;}
+  .field-inline input[type=number]{width:70px; margin:0; padding:8px; text-align:center;}
+  .num-stepper{display:flex; align-items:center; gap:8px;}
+  .num-stepper button{width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:var(--surface);}
+
+  .section-item{
+    display:flex; align-items:center; gap:8px; padding:10px; background:var(--surface); border:1px solid var(--line);
+    border-radius:10px; margin-bottom:6px; font-size:13px;
+  }
+  .section-item .lbl{flex:1;}
+  .section-item .tm{color:var(--ink-soft); font-size:11.5px;}
+
+  .empty-state{text-align:center; padding:40px 16px; color:var(--ink-soft);}
+  .empty-state .big{font-size:34px; margin-bottom:8px;}
+
+  .pdf-progress-overlay{
+    position:fixed; inset:0; z-index:70; background:rgba(20,16,12,0.55);
+    display:none; align-items:center; justify-content:center;
+  }
+  .pdf-progress-overlay.active{display:flex;}
+  .pdf-progress-box{
+    background:var(--surface); border-radius:16px; padding:24px 28px; width:min(300px, 80vw);
+    text-align:center; box-shadow:var(--shadow);
+  }
+  .pdf-progress-box .pp-title{font-weight:600; font-size:14.5px; margin-bottom:4px;}
+  .pdf-progress-box .pp-sub{font-size:12px; color:var(--ink-soft); margin-bottom:14px;}
+  .pdf-progress-track{height:8px; background:var(--parchment-dim); border-radius:6px; overflow:hidden;}
+  .pdf-progress-fill{height:100%; width:0%; background:var(--gold); transition:width .2s ease;}
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%); background:rgba(20,16,12,0.92); color:#fff;
+    padding:10px 18px; border-radius:20px; font-size:13px; z-index:60; opacity:0; pointer-events:none;
+    transition:opacity .2s;
+  }
+  .toast.show{opacity:1;}
+
+  .finish-overlay{
+    position:fixed; inset:0; z-index:75; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity .3s ease;
+  }
+  .finish-overlay.show{opacity:1;}
+  .finish-overlay-inner{
+    background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:22px 30px;
+    text-align:center; font-size:26px; box-shadow:var(--shadow);
+    transform:scale(0.85); transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .finish-overlay.show .finish-overlay-inner{transform:scale(1);}
+  .finish-overlay-text{font-size:14px; font-weight:600; color:var(--ink); margin-top:8px; font-family:Georgia,serif;}
+
+  .back-row{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  .back-row button{background:none; border:none; font-size:20px; color:var(--ink); padding:4px;}
+  .back-row h2{margin:0; font-size:18px;}
+
+  .queue-item{
+    display:flex; align-items:center; gap:10px; padding:10px; background:var(--surface); border:1px solid var(--line);
+    border-radius:10px; margin-bottom:8px;
+  }
+  .queue-item .t{flex:1; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mini-btn{background:var(--parchment-dim); border:1px solid var(--line); border-radius:7px; width:30px; height:30px; font-size:13px; flex-shrink:0;}
+
+  .heat-wrap{overflow-x:auto; padding-bottom:6px;}
+  .heatmap{display:grid; grid-template-rows:repeat(7,12px); grid-auto-flow:column; gap:3px; width:max-content;}
+  .heat-cell{width:12px; height:12px; border-radius:3px; background:var(--parchment-dim);}
+  .heat-cell.l1{background:#E6D6A8;} .heat-cell.l2{background:#D9B968;} .heat-cell.l3{background:var(--gold);} .heat-cell.l4{background:var(--maroon);}
+  .stat-bar-row{display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12.5px;}
+  .stat-bar-row .lbl{width:88px; flex-shrink:0; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .stat-bar-track{flex:1; background:var(--parchment-dim); border-radius:6px; height:10px; overflow:hidden;}
+  .stat-bar-fill{height:100%; background:var(--gold);}
+  .stat-num{width:26px; text-align:right; color:var(--ink-soft);}
+  .stat-tiles{display:flex; gap:10px; margin-bottom:18px;}
+  .stat-tile{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
+  .stat-tile .n{font-size:20px; font-weight:700; font-family:Georgia,serif;}
+  .stat-tile .l{font-size:11px; color:var(--ink-soft); margin-top:2px;}
+
+  .rec-item{display:flex; align-items:center; gap:10px; padding:9px 10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; margin-bottom:6px;}
+  .rec-item .t{flex:1; font-size:13px;}
+  .rec-dot{width:10px; height:10px; border-radius:50%; background:var(--maroon); display:inline-block; margin-right:6px;}
+  .rec-dot.live{animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.3;}}
+
+  .loop-item{display:flex; align-items:center; gap:10px; padding:9px 10px; background:var(--surface); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; font-size:13px;}
+  .loop-item .t{flex:1;}
+
+  .source-toggle{display:flex; gap:8px; margin-bottom:10px;}
+  .source-toggle button{flex:1; padding:9px; border-radius:9px; border:1px solid var(--line); background:var(--surface); font-size:12.5px; color:var(--ink-soft); font-weight:600;}
+  .source-toggle button.active{background:var(--ink); color:var(--gold-bright); border-color:var(--ink);}
+  .offline-badge{display:inline-block; font-size:11px; padding:3px 8px; border-radius:10px; background:var(--sage); color:#fff; margin-left:6px;}
+
+  .image-gallery{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+  .image-gallery .thumb-wrap{position:relative; width:64px; height:64px; border-radius:9px; overflow:hidden; border:1px solid var(--line);}
+  .image-gallery .thumb-wrap img{width:100%; height:100%; object-fit:cover; display:block;}
+  .image-gallery .thumb-del{
+    position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; border:none;
+    background:rgba(20,16,12,0.75); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center;
+  }
+
+  textarea.batch-area{min-height:120px; resize:vertical;}
+
+  .hidden{display:none !important;}
+
+  .wizard-dots{display:flex; gap:6px; justify-content:center; margin-bottom:16px;}
+  .wizard-dots span{width:7px; height:7px; border-radius:50%; background:var(--line);}
+  .wizard-dots span.active{background:var(--gold); width:16px; border-radius:4px;}
+  .wizard-step{display:none;}
+  .wizard-step.active{display:block; animation:fade .15s ease;}
+  .chip-select{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip-select .chip{cursor:pointer;}
+
+  .fine-seek-wrap{margin:6px 0 2px;}
+  .fine-seek-label{font-size:10.5px; color:var(--ink-soft); margin-bottom:4px; display:flex; justify-content:space-between;}
+  .fine-seek-track{position:relative; height:30px; background:var(--parchment-dim); border:1px solid var(--line); border-radius:11px; touch-action:none; overflow:hidden;}
+  .fine-seek-handle{position:absolute; top:3px; left:50%; width:28px; height:22px; margin-left:-14px; border-radius:8px; background:var(--gold); box-shadow:var(--shadow); transition:transform .15s ease;}
+
+  .status-row{display:flex; gap:6px; margin-bottom:14px;}
+  .status-btn{flex:1; padding:9px 3px; border-radius:10px; border:1px solid var(--line); background:var(--surface); font-size:10.5px; text-align:center; color:var(--ink-soft); line-height:1.3;}
+  .status-btn.active{color:#fff; border-color:transparent;}
+  .status-dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; flex-shrink:0;}
+
+  .mini-status-row{display:flex; gap:4px; margin-top:6px;}
+  .mini-status-row button{flex:1; padding:5px 2px; border-radius:7px; border:1px solid var(--line); background:var(--surface); font-size:9.5px; color:var(--ink-soft);}
+
+  .phrase-map{display:flex; flex-wrap:wrap; gap:6px;}
+  .phrase-block{
+    flex:1 1 60px; min-width:60px; max-width:90px; background:var(--surface); border:2px solid var(--line);
+    border-radius:10px; padding:8px 6px; text-align:center; cursor:pointer; position:relative; overflow:hidden;
+    transition:border-color .2s ease, background .2s ease;
+  }
+  .phrase-block .pb-num{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .phrase-block .pb-time{font-size:9.5px; color:var(--ink-soft); margin-top:1px;}
+  .phrase-block .pb-dot{width:11px; height:11px; border-radius:50%; margin:5px auto 0;}
+  .phrase-block .pb-progress{height:3px; background:var(--parchment-dim); border-radius:2px; margin-top:6px; overflow:hidden;}
+  .phrase-block .pb-progress-fill{height:100%; width:0%; background:var(--gold); transition:width .15s linear;}
+  .phrase-block.current{border-color:var(--gold); background:rgba(184,134,43,0.12); box-shadow:0 0 0 1px var(--gold);}
+  .phrase-block.completed{opacity:0.65;}
+  .phrase-block.completed .pb-progress-fill{background:var(--sage);}
+
+  #randomBtn.rolling{animation:diceRoll .4s ease;}
+  @keyframes diceRoll{0%{transform:rotate(0);} 40%{transform:rotate(-18deg) scale(1.1);} 70%{transform:rotate(14deg) scale(1.1);} 100%{transform:rotate(0);}}
+  .practice-status{
+    background:var(--parchment-dim); border-radius:10px; padding:10px 12px; font-size:12.5px;
+    color:var(--ink-soft); margin-bottom:12px; display:none;
+  }
+  .practice-status.active{display:block;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <h1 class="serif" id="headerTitle">Yared Hymn Tracker</h1>
+      <button class="icon-btn" id="darkModeToggle" title="Toggle dark mode">🌙</button>
+    </div>
+    <div class="rule"></div>
+  </header>
+
+  <main>
+
+    <!-- HOME -->
+    <section class="screen active" id="screen-home">
+      <div class="streak-badge hidden" id="streakBadge">🔥 <span id="streakVal">0</span> day streak</div>
+
+      <div class="section-title">Continue</div>
+      <div id="continueCard"></div>
+
+      <div class="section-title">Practice</div>
+      <div class="row" style="margin-bottom:14px;">
+        <button class="btn block" id="suggestedBtn" style="flex:1;">Suggested</button>
+        <button class="btn secondary block" id="randomBtn" style="flex:1;">🎲 Dice</button>
+      </div>
+
+      <div class="card" id="revisionCard" style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-weight:600; font-size:14.5px;">Revision queue</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;" id="revisionCount">Nothing due today</div>
+        </div>
+        <button class="btn secondary" id="goRevision">Open</button>
+      </div>
+
+      <div class="row" style="margin-bottom:14px;">
+        <div class="card" id="queueSummaryCard" style="flex:1; margin-bottom:0; cursor:pointer;">
+          <div style="font-weight:600; font-size:13.5px;">Queue</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;" id="queueSummaryCount">Empty</div>
+        </div>
+        <div class="card" id="statsSummaryCard" style="flex:1; margin-bottom:0; cursor:pointer;">
+          <div style="font-weight:600; font-size:13.5px;">Stats</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Practice history</div>
+        </div>
+      </div>
+
+      <div class="card" id="backupNudge" style="display:none; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-weight:600; font-size:13.5px;">Backup reminder</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;" id="backupNudgeText"></div>
+        </div>
+        <button class="btn secondary" id="backupNudgeBtn">Export now</button>
+      </div>
+
+      <div class="section-title">Recently added</div>
+      <div id="recentList"></div>
+
+      <div class="section-title">Reminders</div>
+      <div class="card">
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+          <span style="font-size:13.5px; font-weight:600;">Daily practice reminder</span>
+          <input type="checkbox" id="reminderEnabled" style="width:auto;">
+        </label>
+        <div class="row" id="reminderTimeRow">
+          <select id="reminderHour" style="flex:1;"></select>
+          <select id="reminderMinute" style="flex:1;"></select>
+        </div>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Only works once this is built into the actual app — has no effect in a browser preview.</div>
+      </div>
+
+      <div class="row" style="margin-top:6px;">
+        <button class="btn ghost block" id="exportDataBtn" style="flex:1;">Export backup</button>
+        <button class="btn ghost block" id="importDataBtn" style="flex:1;">Import backup</button>
+      </div>
+      <input type="file" id="importFileInput" accept="application/json" class="hidden">
+    </section>
+
+    <!-- LIBRARY -->
+    <section class="screen" id="screen-library">
+      <div class="row">
+        <input type="search" id="searchInput" placeholder="Search hymns..." style="flex:1;">
+        <button class="btn secondary" id="openBatchAdd" style="white-space:nowrap;">Batch add</button>
+        <button class="btn secondary" id="toggleSelectMode" style="white-space:nowrap;">Select</button>
+      </div>
+      <div id="categoryChips"></div>
+      <div id="monthChips"></div>
+      <div id="libraryList"></div>
+    </section>
+
+    <div class="bulk-bar hidden" id="bulkBar">
+      <div class="bulk-bar-header">
+        <span id="bulkCount">0 selected</span>
+        <button class="btn ghost" id="bulkCancel">Cancel</button>
+      </div>
+      <div class="bulk-bar-actions">
+        <button class="btn secondary" id="bulkFavorite">♥ Favorite</button>
+        <button class="btn secondary" id="bulkQueue">+Q Queue</button>
+        <button class="btn secondary" id="bulkSetCategory">Category</button>
+        <button class="btn secondary" id="bulkShare">Share</button>
+        <button class="btn danger" id="bulkDelete">Delete</button>
+      </div>
+    </div>
+
+    <!-- REVISION -->
+    <section class="screen" id="screen-revision">
+      <div class="section-title">Due for review</div>
+      <div id="revisionList"></div>
+    </section>
+
+    <!-- QUEUE -->
+    <section class="screen" id="screen-queue">
+      <div class="back-row"><button id="queueBack">‹</button><h2 class="serif">Queue</h2></div>
+      <div class="row" style="margin-bottom:14px;">
+        <button class="btn block" id="playQueueBtn" style="flex:1;">Play queue</button>
+        <button class="btn secondary block" id="clearQueueBtn" style="flex:1;">Clear</button>
+      </div>
+      <div id="queueList"></div>
+    </section>
+
+    <!-- STATS -->
+    <section class="screen" id="screen-stats">
+      <div class="back-row"><button id="statsBack">‹</button><h2 class="serif">Stats</h2></div>
+      <div class="stat-tiles">
+        <div class="stat-tile"><div class="n" id="statTotalHymns">0</div><div class="l">Hymns</div></div>
+        <div class="stat-tile"><div class="n" id="statTotalPractices">0</div><div class="l">Practices</div></div>
+        <div class="stat-tile"><div class="n" id="statStreak">0</div><div class="l">Day streak</div></div>
+      </div>
+      <div class="section-title">Practice heatmap (last 12 weeks)</div>
+      <div class="heat-wrap"><div class="heatmap" id="heatmapGrid"></div></div>
+      <div class="section-title">By category</div>
+      <div id="categoryStats"></div>
+    </section>
+
+    <!-- PLAYER -->
+    <section class="screen player-screen" id="screen-player">
+      <div class="player-sticky-top" id="playerStickyTop">
+        <div class="hymn-title-block">
+          <div class="title-row">
+            <h2 class="serif" id="playerTitle">—</h2>
+            <button class="icon-btn" id="pageReset" title="Reset zoom">⤾</button>
+            <button class="icon-btn" id="focusModeBtn" title="Focus mode (fill screen)">⛶</button>
+            <button class="icon-btn" id="pinToggleBtn" title="Pin lyrics while scrolling">📌</button>
+          </div>
+          <div class="rule"></div>
+        </div>
+
+        <div class="lyric-frame" id="lyricFrame">
+          <div class="empty-msg">No lyric images for this hymn yet.</div>
+        </div>
+        <div class="page-controls">
+          <button class="icon-btn" id="pagePrev">‹</button>
+          <div class="p-info" id="pageInfo">0 / 0</div>
+          <button class="icon-btn" id="pageNext">›</button>
+        </div>
+
+        <div class="fine-seek-wrap">
+          <div class="fine-seek-label"><span>Fine seek — drag to nudge</span><span id="fineSeekDelta"></span></div>
+          <div class="fine-seek-track" id="fineSeekTrack">
+            <div class="fine-seek-handle" id="fineSeekHandle"></div>
+          </div>
+        </div>
+
+        <div class="seek-wrap">
+          <input type="range" id="seekBar" min="0" max="1000" value="0">
+          <div class="time-row"><span id="curTime">0:00</span><span id="durTime">0:00</span></div>
+        </div>
+
+        <div class="transport">
+          <button class="side" id="prevHymnBtn">⏮</button>
+          <button class="play" id="playPauseBtn">▶</button>
+          <button class="side" id="nextHymnBtn">⏭</button>
+        </div>
+      </div>
+      <div id="playerStickySpacer" style="height:0px;"></div>
+
+      <button class="btn secondary block" id="openPlaybackOptions" style="margin-bottom:14px;">⋮ Playback options — <span id="playbackOptionsSummary">1× · Loop off</span></button>
+
+      <div class="section-title">How well do you know this?</div>
+      <div class="status-row" id="statusRow"></div>
+
+      <div class="practice-status" id="practiceStatus"></div>
+
+      <div class="subtabs">
+        <button data-pane="pane-ab" class="active">AB Repeat</button>
+        <button data-pane="pane-teacher">Teacher</button>
+        <button data-pane="pane-continuous">Continuous</button>
+        <button data-pane="pane-record">Record</button>
+        <button data-pane="pane-phrases">Phrases</button>
+      </div>
+
+      <div class="subpane active" id="pane-ab">
+        <div class="row" style="margin-bottom:10px;">
+          <button class="btn secondary" id="setA" style="flex:1;">Set A <span id="aVal"></span></button>
+          <button class="btn secondary" id="setB" style="flex:1;">Set B <span id="bVal"></span></button>
+        </div>
+        <button class="btn block" id="toggleAB">Enable AB Repeat</button>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn secondary block" id="abPrevBtn" style="flex:1;">‹ Previous</button>
+          <button class="btn secondary block" id="abNextBtn" style="flex:1;">Next ›</button>
+        </div>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Next/Previous shift the A–B window forward or back by its own length.</div>
+        <button class="btn secondary block" id="saveLoopBtn" style="margin-top:12px;">Save this loop</button>
+        <div class="section-title">Saved loops</div>
+        <div id="loopsList"></div>
+      </div>
+
+      <div class="subpane" id="pane-record">
+        <div class="row" style="margin-bottom:12px;">
+          <button class="btn block danger" id="toggleRecordBtn" style="flex:1;"><span class="rec-dot" id="recDot"></span>Record practice</button>
+        </div>
+        <div class="section-title">Recordings for this hymn</div>
+        <div id="recordingsList"></div>
+      </div>
+
+      <div class="subpane" id="pane-phrases">
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">
+          Mark where each phrase starts (or auto-suggest from silence gaps). Tap a phrase to loop it; tap its dot to mark how well you know it.
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="btn secondary block" id="markBoundaryBtn" style="flex:1;">+ Mark boundary here</button>
+          <button class="btn secondary block" id="autoSuggestBtn" style="flex:1;">✨ Auto-suggest</button>
+        </div>
+        <div id="autoSuggestProgress" style="font-size:12px; color:var(--ink-soft); margin-bottom:8px; display:none;"></div>
+        <div class="phrase-map" id="phraseMap"></div>
+        <button class="btn ghost block" id="clearPhrasesBtn" style="margin-top:10px;">Clear all phrases</button>
+      </div>
+
+      <div class="subpane" id="pane-teacher">
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">
+          Plays a segment, then pauses for the segment's own length plus your extra seconds, then repeats it — forever, until you move on or stop.
+        </div>
+        <div class="source-toggle">
+          <button type="button" id="teacherModeDefaultBtn" class="active">Default</button>
+          <button type="button" id="teacherModeAbBtn">AB range</button>
+        </div>
+        <div id="teacherDefaultFields">
+          <label>Duration to repeat (sec)</label>
+          <div class="num-stepper" style="margin-bottom:12px;">
+            <button data-target="teacherDuration" data-d="-1">–</button>
+            <input type="number" id="teacherDuration" value="5" min="1">
+            <button data-target="teacherDuration" data-d="1">+</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;">Segment starts wherever playback currently is when you press Start.</div>
+        </div>
+        <div id="teacherAbFields" class="hidden">
+          <div class="row" style="margin-bottom:12px;">
+            <button class="btn secondary" id="teacherSetA" style="flex:1;">Set A <span id="teacherAVal"></span></button>
+            <button class="btn secondary" id="teacherSetB" style="flex:1;">Set B <span id="teacherBVal"></span></button>
+          </div>
+        </div>
+        <div class="field-inline">
+          <label>Extra seconds after pause</label>
+          <div class="num-stepper">
+            <button data-target="teacherExtraSecs" data-d="-1">–</button>
+            <input type="number" id="teacherExtraSecs" value="2" min="0">
+            <button data-target="teacherExtraSecs" data-d="1">+</button>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="btn block" id="startTeacher" style="flex:1;">Start</button>
+          <button class="btn secondary" id="stopTeacher" style="flex:1;">Stop</button>
+        </div>
+        <div class="row hidden" id="teacherQuickActions" style="margin-bottom:8px;">
+          <button class="btn secondary block" id="teacherAgainBtn" style="flex:1;">↻ Again now</button>
+          <button class="btn block" id="teacherGotItBtn" style="flex:1;">✓ Got it, next ›</button>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="btn secondary block" id="teacherPrevBtn" style="flex:1;">‹ Previous</button>
+          <button class="btn secondary block" id="teacherNextBtn" style="flex:1;">Next ›</button>
+        </div>
+        <button class="btn secondary block" id="teacherFromStartBtn">Start from beginning (once, now)</button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin:6px 0 12px;">— or trigger it automatically every so many phrase changes: —</div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin-bottom:8px;">
+          <input type="checkbox" id="teacherReviewEnabled" style="width:auto; margin:0;"> Review from a set beginning periodically
+        </label>
+        <div class="field-inline">
+          <label>Every this many phrase changes</label>
+          <div class="num-stepper">
+            <button data-target="teacherReviewEveryN" data-d="-1">–</button>
+            <input type="number" id="teacherReviewEveryN" value="3" min="1">
+            <button data-target="teacherReviewEveryN" data-d="1">+</button>
+          </div>
+        </div>
+        <button class="btn secondary block" id="teacherSetBeginningBtn">Set beginning <span id="teacherBeginningVal"></span></button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Defaults to 0:00 if you don't set one. When a review comes up, press Next once more to move past it into the new phrase.</div>
+      </div>
+
+      <div class="subpane" id="pane-continuous">
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">
+          Same mechanics as Teacher Mode, but after the set number of repeats it automatically moves to the next segment on its own.
+        </div>
+        <div class="source-toggle">
+          <button type="button" id="contModeDefaultBtn" class="active">Default</button>
+          <button type="button" id="contModeAbBtn">AB range</button>
+        </div>
+        <div id="contDefaultFields">
+          <label>Duration to repeat (sec)</label>
+          <div class="num-stepper" style="margin-bottom:12px;">
+            <button data-target="contDuration" data-d="-1">–</button>
+            <input type="number" id="contDuration" value="5" min="1">
+            <button data-target="contDuration" data-d="1">+</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;">Segment starts wherever playback currently is when you press Start.</div>
+        </div>
+        <div id="contAbFields" class="hidden">
+          <div class="row" style="margin-bottom:12px;">
+            <button class="btn secondary" id="contSetA" style="flex:1;">Set A <span id="contAVal"></span></button>
+            <button class="btn secondary" id="contSetB" style="flex:1;">Set B <span id="contBVal"></span></button>
+          </div>
+        </div>
+        <div class="field-inline">
+          <label>Extra seconds after pause</label>
+          <div class="num-stepper">
+            <button data-target="contExtraSecs" data-d="-1">–</button>
+            <input type="number" id="contExtraSecs" value="2" min="0">
+            <button data-target="contExtraSecs" data-d="1">+</button>
+          </div>
+        </div>
+        <div class="field-inline">
+          <label>Number of repeats</label>
+          <div class="num-stepper">
+            <button data-target="contRepeats" data-d="-1">–</button>
+            <input type="number" id="contRepeats" value="3" min="1">
+            <button data-target="contRepeats" data-d="1">+</button>
+          </div>
+        </div>
+        <div class="card" id="contEstimateBox" style="padding:10px 12px; margin-bottom:10px;">
+          <div style="font-size:12px; color:var(--ink-soft);">Estimated time to go through the whole hymn</div>
+          <div style="font-size:16px; font-weight:700; font-family:Georgia,serif; margin-top:2px;" id="contEstimateValue">—</div>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="btn block" id="startContinuous" style="flex:1;">Start</button>
+          <button class="btn secondary" id="stopContinuous" style="flex:1;">Stop</button>
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="btn secondary block" id="contPrevBtn" style="flex:1;">‹ Previous</button>
+          <button class="btn secondary block" id="contNextBtn" style="flex:1;">Next ›</button>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin-bottom:8px;">
+          <input type="checkbox" id="contReviewEnabled" style="width:auto; margin:0;"> Review from a set beginning periodically
+        </label>
+        <div class="field-inline">
+          <label>Every this many segments</label>
+          <div class="num-stepper">
+            <button data-target="contReviewEveryN" data-d="-1">–</button>
+            <input type="number" id="contReviewEveryN" value="3" min="1">
+            <button data-target="contReviewEveryN" data-d="1">+</button>
+          </div>
+        </div>
+        <button class="btn secondary block" id="contSetBeginningBtn">Set beginning <span id="contBeginningVal"></span></button>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">Defaults to 0:00 if you don't set one.</div>
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); margin:14px 0 4px;">
+          <input type="checkbox" id="blindRecallEnabled" style="width:auto; margin:0;"> 🙈 Blind recall — randomly mute a phrase you've already covered
+        </label>
+        <div style="font-size:11.5px; color:var(--ink-soft);">Sing it yourself, then it plays for real on the next repeat so you can check.</div>
+        <div class="card hidden" id="blindRecallHint" style="text-align:center; font-weight:600; margin-top:8px;">🙈 Recall this phrase — sing along</div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="mini-player hidden" id="miniPlayer">
+    <div class="mini-seek" id="miniSeek">
+      <div class="mini-seek-track">
+        <div class="mini-seek-fill" id="miniSeekFill"></div>
+        <div class="mini-seek-handle" id="miniSeekHandle"></div>
+      </div>
+    </div>
+    <div class="mini-player-row">
+      <div class="thumb" id="miniThumb">♪</div>
+      <div class="info"><div class="t" id="miniTitle">—</div></div>
+      <div class="controls">
+        <button id="miniPrev">⏮</button>
+        <button class="mp-play" id="miniPlayPause">▶</button>
+        <button id="miniNext">⏭</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabbar">
+    <button data-screen="home" class="active"><span class="ic">⌂</span>Home</button>
+    <button data-screen="library"><span class="ic">🎵</span>Library</button>
+    <button data-screen="player"><span class="ic">▶</span>Player</button>
+    <button data-screen="revision"><span class="ic">↻</span>Revision</button>
+  </nav>
+
+  <button class="fab" id="addHymnFab">+</button>
+
+  <!-- Add/Edit modal -->
+  <div class="modal-backdrop" id="hymnModalBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeModal">✕</button>
+      <h2 id="modalTitle">Add hymn</h2>
+
+      <div class="section-title" style="margin-top:2px;">Details</div>
+      <label>Title</label>
+      <input type="text" id="fTitle" placeholder="Hymn title">
+      <label>Category</label>
+      <div class="chip-select" id="fCategoryChips"></div>
+      <input type="text" id="fCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px; margin-bottom:12px;">
+      <label>Tags (comma separated)</label>
+      <input type="text" id="fTags" placeholder="e.g. sunday, advanced">
+
+      <div class="section-title">Calendar</div>
+      <label>Month</label>
+      <select id="fMonth">
+        <option value="">— None —</option>
+      </select>
+      <label>Celebration / feast</label>
+      <input type="text" id="fCelebration" list="celebrationSuggestions" placeholder="e.g. Timket">
+      <datalist id="celebrationSuggestions"></datalist>
+
+      <div class="section-title">Audio</div>
+      <div class="source-toggle">
+        <button type="button" id="srcFileBtn" class="active">Upload file</button>
+        <button type="button" id="srcLinkBtn">Paste link</button>
+      </div>
+      <div id="audioFileWrap">
+        <input type="file" id="fAudio" accept="audio/*">
+      </div>
+      <div id="audioLinkWrap" class="hidden">
+        <input type="text" id="fAudioLink" placeholder="https://...">
+      </div>
+      <div id="currentAudioNote" style="font-size:12px; color:var(--ink-soft); margin:6px 0 0;"></div>
+      <button class="btn secondary block hidden" id="downloadOfflineBtn" style="margin-top:10px;">Download for offline</button>
+
+      <div class="section-title">Lyrics</div>
+      <div id="currentImagesNote" style="font-size:12px; color:var(--ink-soft); margin:-2px 0 8px;"></div>
+      <div class="image-gallery" id="currentImagesGallery"></div>
+      <label style="margin-top:4px;">Add more pages (images or PDF)</label>
+      <input type="file" id="fImages" accept="image/*,application/pdf" multiple>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn block" id="saveHymn" style="flex:1;">Save</button>
+        <button class="btn secondary block" id="shareHymnBtn" style="flex:1;">Share</button>
+        <button class="btn danger block hidden" id="deleteHymn" style="flex:1;">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add hymn wizard -->
+  <div class="modal-backdrop" id="addWizardBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeWizard">✕</button>
+      <h2>Add hymn</h2>
+      <div class="wizard-dots" id="wizardDots"></div>
+
+      <div class="wizard-step active" id="wstep-audio">
+        <label>Audio source</label>
+        <div class="source-toggle">
+          <button type="button" id="wSrcFileBtn" class="active">Upload file</button>
+          <button type="button" id="wSrcLinkBtn">Paste link</button>
+        </div>
+        <div id="wAudioFileWrap">
+          <input type="file" id="wAudio" accept="audio/*">
+        </div>
+        <div id="wAudioLinkWrap" class="hidden">
+          <input type="text" id="wAudioLink" placeholder="https://...">
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); margin:6px 0 8px;">Preview before you commit:</div>
+        <audio id="wAudioPreview" controls style="width:100%; margin-bottom:6px;"></audio>
+      </div>
+
+      <div class="wizard-step" id="wstep-name">
+        <label>Title</label>
+        <input type="text" id="wTitle" placeholder="Hymn title">
+        <label>Category</label>
+        <div class="chip-select" id="wCategoryChips"></div>
+        <input type="text" id="wCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
+      </div>
+
+      <div class="wizard-step" id="wstep-calendar">
+        <label>Month</label>
+        <select id="wMonth"><option value="">— None —</option></select>
+        <label>Celebration / feast</label>
+        <input type="text" id="wCelebration" list="celebrationSuggestions" placeholder="e.g. Timket">
+        <label>Tags (comma separated)</label>
+        <input type="text" id="wTags" placeholder="e.g. sunday, advanced">
+      </div>
+
+      <div class="wizard-step" id="wstep-lyrics">
+        <label>Lyric images or PDF (optional; each PDF page becomes its own page)</label>
+        <input type="file" id="wImages" accept="image/*,application/pdf" multiple>
+        <div id="wImagesNote" style="font-size:12px; color:var(--ink-soft); margin:-6px 0 12px;"></div>
+        <div class="section-title">Review</div>
+        <div id="wReviewBox" class="card" style="font-size:13px;"></div>
+      </div>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn secondary block hidden" id="wBackBtn" style="flex:1;">‹ Back</button>
+        <button class="btn block" id="wNextBtn" style="flex:1;">Next ›</button>
+        <button class="btn block hidden" id="wSaveBtn" style="flex:1;">Save hymn</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal-backdrop" id="batchModalBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeBatchModal">✕</button>
+      <h2>Batch add</h2>
+      <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:10px;">
+        Month and celebration below apply to everything added in this batch, from links or local files.
+      </div>
+      <label>Month (optional, applies to all)</label>
+      <select id="batchMonth"><option value="">— None —</option></select>
+      <label>Celebration / feast (optional, applies to all)</label>
+      <input type="text" id="batchCelebration" list="celebrationSuggestions" placeholder="e.g. Timket">
+
+      <div class="section-title">From links</div>
+      <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">
+        One hymn per line: <code>Title | Category | https://audio-link</code> (category is optional — <code>Title | https://link</code> also works).
+      </div>
+      <textarea id="batchText" class="batch-area" placeholder="Meswaeta Zemare | ቁም | https://example.com/audio1.mp3&#10;Kum Zemare | https://example.com/audio2.mp3"></textarea>
+
+      <div class="section-title">From local files</div>
+      <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;">
+        Pick multiple audio files from this device. Titles are guessed from filenames (rename later if needed). Category below applies to all files picked here.
+      </div>
+      <input type="file" id="batchFiles" accept="audio/*" multiple>
+      <label style="margin-top:8px;">Category for these files (optional)</label>
+      <div class="chip-select" id="batchFilesCategoryChips"></div>
+      <input type="text" id="batchFilesCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
+
+      <button class="btn block" id="submitBatchAdd" style="margin-top:14px;">Review each hymn ›</button>
+    </div>
+  </div>
+
+  <!-- Batch review wizard: one hymn at a time, with preview -->
+  <div class="modal-backdrop" id="batchReviewBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeBatchReview">✕</button>
+      <h2>Review hymn <span id="batchReviewPos">1 of 1</span></h2>
+
+      <audio id="batchReviewPreview" controls style="width:100%; margin-bottom:12px;"></audio>
+
+      <label>Title</label>
+      <input type="text" id="batchReviewTitle" placeholder="Hymn title">
+      <label>Category</label>
+      <div class="chip-select" id="batchReviewCategoryChips"></div>
+      <input type="text" id="batchReviewCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
+
+      <div class="section-title">Lyrics (optional)</div>
+      <input type="file" id="batchReviewImages" accept="image/*,application/pdf" multiple>
+      <div id="batchReviewImagesNote" style="font-size:12px; color:var(--ink-soft); margin:6px 0 0;"></div>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn secondary block" id="batchReviewSkip" style="flex:1;">Skip</button>
+        <button class="btn block" id="batchReviewAdd" style="flex:1;">Add &amp; Next ›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="playbackOptionsBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closePlaybackOptions">✕</button>
+      <h2>Playback options</h2>
+
+      <div class="section-title" style="margin-top:2px;">Loop</div>
+      <div class="toggle-row">
+        <button class="toggle-pill" id="loopHymnBtn">Loop hymn</button>
+        <button class="toggle-pill" id="loopSetBtn">Loop set</button>
+      </div>
+
+      <div class="section-title">Speed</div>
+      <div class="toggle-row" id="speedRow">
+        <button class="toggle-pill speed-pill" data-speed="0.75">0.75×</button>
+        <button class="toggle-pill speed-pill" data-speed="1">1×</button>
+        <button class="toggle-pill speed-pill" data-speed="1.25">1.25×</button>
+        <button class="toggle-pill speed-pill" data-speed="1.5">1.5×</button>
+        <button class="toggle-pill speed-pill" data-speed="2">2×</button>
+      </div>
+
+      <div class="section-title">Sleep timer</div>
+      <div class="toggle-row" id="sleepTimerRow">
+        <button class="toggle-pill sleep-pill" data-mins="0">Off</button>
+        <button class="toggle-pill sleep-pill" data-mins="15">15m</button>
+        <button class="toggle-pill sleep-pill" data-mins="30">30m</button>
+        <button class="toggle-pill sleep-pill" data-mins="45">45m</button>
+        <button class="toggle-pill sleep-pill" data-mins="60">60m</button>
+      </div>
+      <div style="text-align:center; font-size:11.5px; color:var(--ink-soft); margin:-4px 0 10px; display:none;" id="sleepTimerStatus"></div>
+
+      <div class="section-title">Cues</div>
+      <div class="toggle-row">
+        <button class="toggle-pill on" id="cueTonesBtn">🔔 Cue tones</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pdf-progress-overlay" id="pdfProgressOverlay">
+    <div class="pdf-progress-box">
+      <div class="pp-title">Converting PDF…</div>
+      <div class="pp-sub" id="pdfProgressSub">Page 0 of 0</div>
+      <div class="pdf-progress-track"><div class="pdf-progress-fill" id="pdfProgressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="finish-overlay" id="finishFlourishOverlay">
+    <div class="finish-overlay-inner">🕊️ 🕊️ 🕊️<div class="finish-overlay-text">Hymn complete</div></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<audio id="audioEl" preload="metadata"></audio>
+
+<!-- pdf.js: used only to convert an uploaded PDF's pages into images at add/edit time.
+     Requires a network connection the first time it loads; once a hymn's PDF pages
+     have been converted and stored, playback/viewing is fully offline as usual. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   INDEXEDDB LAYER
+   ============================================================ */
+const DB_NAME = 'YaredHymnDB', DB_VERSION = 1;
+
+const ETHIOPIAN_MONTHS = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miazia','Ginbot','Sene','Hamle','Nehase','Pagume'];
+const CELEBRATION_SUGGESTIONS = ['Enkutatash (New Year)','Meskel','Genna (Christmas)','Timket (Epiphany)','Hosanna (Palm Sunday)','Siklet (Good Friday)','Fasika (Easter)','Erget (Ascension)','Paraclete (Pentecost)','Kidus Yohannes','Buhe','Debre Tabor (Transfiguration)'];
+const DEFAULT_CATEGORY_PRESETS = ['ቁም','መረግድ','ዜማ','ዝማሜ'];
+const STATUS_DEFS = {
+  new:            {label:'New',             days:0,  color:'#8a8a8a'},
+  needsPractice:  {label:'Needs Practice',  days:1,  color:'#7A2E2E'},
+  learning:       {label:'Learning',        days:4,  color:'#B8862B'},
+  wellMemorized:  {label:'Well Memorized',  days:14, color:'#5F7A5E'}
+};
+const STATUS_ORDER = ['new','needsPractice','learning','wellMemorized'];
+let db;
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e)=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('hymns')) d.createObjectStore('hymns',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('media')) d.createObjectStore('media',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('sets')) d.createObjectStore('sets',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'key'});
+    };
+    req.onsuccess = ()=>{db=req.result; resolve(db);};
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function tx(store, mode){ return db.transaction(store, mode).objectStore(store); }
+function dbGet(store,key){ return new Promise((res,rej)=>{const r=tx(store,'readonly').get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}); }
+function dbGetAll(store){ return new Promise((res,rej)=>{const r=tx(store,'readonly').getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}); }
+function dbPut(store,val){ return new Promise((res,rej)=>{const r=tx(store,'readwrite').put(val); r.onsuccess=()=>res(val); r.onerror=()=>rej(r.error);}); }
+function dbDelete(store,key){ return new Promise((res,rej)=>{const r=tx(store,'readwrite').delete(key); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error);}); }
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+/* ============================================================
+   PDF LYRICS — convert each page of an uploaded PDF into a JPEG
+   image blob, then store/treat it exactly like a regular lyric
+   image page. This lets the existing multi-page viewer (pinch
+   zoom, pan, prev/next, pinning) work for PDFs with no changes.
+   ============================================================ */
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';
+}
+function isPdfFile(file){
+  return file && (file.type==='application/pdf' || /\.pdf$/i.test(file.name||''));
+}
+function showPdfProgress(current, total){
+  document.getElementById('pdfProgressOverlay').classList.add('active');
+  document.getElementById('pdfProgressSub').textContent = `Page ${current} of ${total}`;
+  document.getElementById('pdfProgressFill').style.width = total ? ((current/total)*100)+'%' : '0%';
+}
+function hidePdfProgress(){
+  document.getElementById('pdfProgressOverlay').classList.remove('active');
+  document.getElementById('pdfProgressFill').style.width='0%';
+}
+async function pdfFileToImageBlobs(file, onProgress){
+  if(!window.pdfjsLib){ throw new Error('PDF support did not load (no internet connection?)'); }
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const blobs = [];
+  for(let i=1; i<=pdf.numPages; i++){
+    if(onProgress) onProgress(i-1, pdf.numPages);
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale: 2});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    await page.render({canvasContext: ctx, viewport}).promise;
+    const blob = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.92));
+    if(blob) blobs.push(blob);
+    if(onProgress) onProgress(i, pdf.numPages);
+  }
+  return blobs;
+}
+/* Expands a FileList-derived array into individual image File/Blob-like
+   entries, converting any PDFs into one entry per page along the way,
+   with a visible per-page progress overlay while it works. */
+async function expandLyricFiles(files){
+  const out = [];
+  for(const f of files){
+    if(isPdfFile(f)){
+      try{
+        showPdfProgress(0, 1);
+        const pages = await pdfFileToImageBlobs(f, (done,total)=> showPdfProgress(done,total));
+        pages.forEach(b=> out.push(b));
+      }catch(err){
+        toast('Could not convert that PDF: '+err.message);
+      }finally{
+        hidePdfProgress();
+      }
+    } else {
+      out.push(f);
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let hymns = [];
+let currentHymn = null;       // full hymn object currently loaded in player
+let currentQueue = [];        // array of hymn ids for "loop set" / suggested / random navigation
+let queueIndex = -1;
+let objectUrlCache = {};      // mediaId -> objectURL, so we never re-fetch/re-create <img> src needlessly
+let pageIndex = 0;
+let editingHymnId = null;
+
+// zoom/pan state per page (kept in DOM element dataset, not rebuilt)
+
+// AB Repeat (top-level tab): simple manual loop between two points.
+let ab = {a:null, b:null, enabled:false};
+
+// Teacher / Continuous share one practice engine. Only one can run at a time.
+// segStart/segLength define the current segment; in 'cumulative' mode the
+// active range is cumulativeStart -> cumulativeEnd instead (used by Teacher's
+// manual "Start from beginning" AND Continuous's periodic beginning-review,
+// which are otherwise independent features sharing the same bounds fields).
+let practice = {
+  active:false, pane:null,            // pane: 'teacher' | 'continuous'
+  subMode:'default',                  // 'default' (plain duration) | 'ab' (A/B points)
+  segStart:0, segLength:0, extraSecs:0,
+  repeatCount:1, repDone:0,
+  cumulative:false, cumulativeStart:0, cumulativeEnd:0,
+  reviewPending:false,                // true while a periodic/manual beginning-review is in progress
+  waiting:false, timer:null
+};
+let teacherAB = {a:null, b:null};
+let contAB = {a:null, b:null};
+let teacherSubMode='default', contSubMode='default';
+// Periodic "review from a set beginning" — Continuous triggers automatically
+// once a segment's repeats are exhausted; Teacher triggers on manual Next.
+let contBeginningPoint = null;
+let contSegmentsSinceReview = 0;
+let teacherBeginningPoint = null;
+let teacherSegmentsSinceReview = 0;
+
+const audio = document.getElementById('audioEl');
+const toastEl = document.getElementById('toast');
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.classList.remove('show'),1800); }
+
+/* ============================================================
+   CUE TONES — soft synthesized beeps (no audio files needed) marking
+   "listen again" (pause starting) vs "your turn" (replay starting),
+   plus a short flourish when a full Continuous Mode run finishes.
+   Toggleable via cueTonesEnabled; persisted per session only.
+   ============================================================ */
+let cueTonesEnabled = true;
+let sharedAudioCtx = null;
+function getAudioCtx(){
+  if(!sharedAudioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return null;
+    sharedAudioCtx = new Ctx();
+  }
+  if(sharedAudioCtx.state==='suspended') sharedAudioCtx.resume().catch(()=>{});
+  return sharedAudioCtx;
+}
+function playTone(freq, startOffset, duration, gainPeak){
+  if(!cueTonesEnabled) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const t0 = ctx.currentTime + (startOffset||0);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(gainPeak||0.12, t0+0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0+(duration||0.25));
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0+(duration||0.25)+0.02);
+}
+function playCueListenAgain(){ playTone(392, 0, 0.18, 0.09); }   // soft, lower — "pause / listen"
+function playCueYourTurn(){ playTone(523, 0, 0.16, 0.11); }      // brighter, higher — "replay starting"
+function playFinishFlourish(){
+  playTone(523, 0,    0.18, 0.12);
+  playTone(659, 0.14, 0.18, 0.12);
+  playTone(784, 0.28, 0.32, 0.13);
+}
+function showFinishOverlay(){
+  const el = document.getElementById('finishFlourishOverlay');
+  if(!el) return;
+  el.classList.add('show');
+  setTimeout(()=> el.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+const screens = ['home','library','player','revision','queue','stats'];
+function showScreen(name){
+  screens.forEach(s=>{
+    document.getElementById('screen-'+s).classList.toggle('active', s===name);
+  });
+  document.querySelectorAll('nav.tabbar button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.screen===name);
+  });
+  document.getElementById('app').classList.toggle('player-mode', name==='player');
+  if(name==='home') renderHome();
+  if(name==='library') renderLibrary();
+  if(name==='revision') renderRevisionScreen();
+  if(name==='queue') renderQueueScreen();
+  if(name==='stats') renderStatsScreen();
+  if(name==='player' && typeof positionPinnedBlock==='function'){
+    requestAnimationFrame(positionPinnedBlock);
+  }
+  if(typeof updateMiniPlayer==='function') updateMiniPlayer();
+}
+document.getElementById('queueSummaryCard').addEventListener('click', ()=>showScreen('queue'));
+document.getElementById('statsSummaryCard').addEventListener('click', ()=>showScreen('stats'));
+document.getElementById('queueBack').addEventListener('click', ()=>showScreen('home'));
+document.getElementById('statsBack').addEventListener('click', ()=>showScreen('home'));
+document.querySelectorAll('nav.tabbar button').forEach(b=>{
+  b.addEventListener('click', ()=>showScreen(b.dataset.screen));
+});
+
+/* ============================================================
+   MEDIA HELPERS (object URLs are cached & never revoked mid-session
+   so <img>/<audio> src never gets reset while looping)
+   ============================================================ */
+async function urlFor(mediaId){
+  if(!mediaId) return null;
+  if(objectUrlCache[mediaId]) return objectUrlCache[mediaId];
+  const rec = await dbGet('media', mediaId);
+  if(!rec) return null;
+  const url = URL.createObjectURL(rec.blob);
+  objectUrlCache[mediaId] = url;
+  return url;
+}
+
+async function getAudioPlaybackUrl(h){
+  if(h.offlineId){ const u = await urlFor(h.offlineId); if(u) return u; }
+  if(h.audioType==='link' && h.audioUrl) return h.audioUrl;
+  if(h.audioId) return await urlFor(h.audioId);
+  return null;
+}
+
+/* ============================================================
+   LIBRARY: CRUD
+   ============================================================ */
+async function loadHymns(){
+  hymns = await dbGetAll('hymns');
+  hymns.sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+}
+
+async function saveHymnFromForm(){
+  const title = document.getElementById('fTitle').value.trim();
+  if(!title){ toast('Title is required'); return; }
+  const customCat = document.getElementById('fCategoryCustom').value.trim();
+  const category = customCat || modalSelectedCategory || '';
+  if(customCat) await addCustomCategory(customCat);
+  const month = document.getElementById('fMonth').value;
+  const celebration = document.getElementById('fCelebration').value.trim();
+  const tags = document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const audioFile = document.getElementById('fAudio').files[0];
+  const audioLink = document.getElementById('fAudioLink').value.trim();
+  const imageFiles = Array.from(document.getElementById('fImages').files);
+
+  let hymn;
+  if(editingHymnId){
+    hymn = await dbGet('hymns', editingHymnId);
+  } else {
+    hymn = {
+      id: uid(), title:'', category:'', month:'', celebration:'', tags:[], favorite:false,
+      audioType:'file', audioId:null, audioUrl:null, offlineId:null,
+      images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
+      stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
+      createdAt: Date.now()
+    };
+  }
+  hymn.title = title;
+  hymn.category = category;
+  hymn.month = month;
+  hymn.celebration = celebration;
+  hymn.tags = tags;
+  hymn.updatedAt = Date.now();
+
+  hymn.loops = hymn.loops||[];
+  hymn.recordings = hymn.recordings||[];
+
+  let linkJustSet = false;
+  if(audioSourceMode==='link'){
+    if(audioLink){
+      linkJustSet = hymn.audioUrl!==audioLink || !hymn.offlineId;
+      hymn.audioType='link';
+      hymn.audioUrl=audioLink;
+      hymn.audioId=null;
+      hymn.offlineId=null;
+      hymn.duration=0;
+    }
+  } else if(audioFile){
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob:audioFile});
+    hymn.audioType='file';
+    hymn.audioId = mediaId;
+    hymn.audioUrl=null;
+    hymn.duration = 0; // will be detected on next load
+  }
+
+  if(imageFiles.length){
+    const expanded = await expandLyricFiles(imageFiles);
+    for(const f of expanded){
+      const mediaId = uid();
+      await dbPut('media', {id:mediaId, blob:f});
+      hymn.images.push({id:mediaId, order:hymn.images.length});
+    }
+  }
+
+  await dbPut('hymns', hymn);
+  closeModal();
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Saved');
+  if(linkJustSet){
+    downloadOffline(hymn.id); // fire-and-forget; shows its own toasts
+  }
+}
+
+async function deleteHymnById(id){
+  await dbDelete('hymns', id);
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  closeModal();
+  toast('Deleted');
+}
+
+/* ============================================================
+   ADD HYMN WIZARD — step-by-step: audio+preview, name+category,
+   month+celebration+tags, lyrics+review. Batch add stays a
+   single bulk form (see BATCH ADD below); this wizard is for
+   adding one hymn at a time with a chance to preview the audio
+   before committing.
+   ============================================================ */
+const wizardSteps = ['wstep-audio','wstep-name','wstep-calendar','wstep-lyrics'];
+let wizardIndex = 0;
+let wizardAudioSourceMode='file';
+let wizardSelectedCategory='';
+let wizardPreviewUrl=null;
+let wizardIncomingFile=null; // set when the app was opened "with" an audio file from outside
+
+function openAddWizard(){
+  wizardIndex = 0;
+  wizardSelectedCategory='';
+  wizardAudioSourceMode='file';
+  wizardIncomingFile=null;
+  document.getElementById('wAudio').value='';
+  document.getElementById('wAudioLink').value='';
+  document.getElementById('wAudioPreview').removeAttribute('src');
+  document.getElementById('wTitle').value='';
+  document.getElementById('wCategoryCustom').value='';
+  document.getElementById('wTags').value='';
+  document.getElementById('wCelebration').value='';
+  document.getElementById('wImages').value='';
+  document.getElementById('wImagesNote').textContent='';
+  setWizardSourceMode('file');
+  populateMonthSelect(document.getElementById('wMonth'));
+  populateCelebrationSuggestions();
+  renderCategoryChipsInWizard(null);
+  showWizardStep(0);
+  document.getElementById('addWizardBackdrop').classList.add('active');
+}
+/* Opens the Add wizard pre-loaded with a file handed to the app from
+   outside (via "Open with" or a share target) — audio input can't be
+   set programmatically for security reasons, so we keep the File in
+   wizardIncomingFile and saveWizardHymn uses that instead when present. */
+function openAddWizardWithFile(file){
+  openAddWizard();
+  wizardIncomingFile = file;
+  setWizardSourceMode('file');
+  if(wizardPreviewUrl){ URL.revokeObjectURL(wizardPreviewUrl); wizardPreviewUrl=null; }
+  wizardPreviewUrl = URL.createObjectURL(file);
+  document.getElementById('wAudioPreview').src = wizardPreviewUrl;
+  document.getElementById('wTitle').value = filenameToTitle(file.name);
+  toast('Audio loaded — finish setting it up below');
+  showWizardStep(1);
+}
+function closeWizard(){
+  document.getElementById('addWizardBackdrop').classList.remove('active');
+  document.getElementById('wAudioPreview').pause();
+  wizardIncomingFile=null;
+  if(wizardPreviewUrl){ URL.revokeObjectURL(wizardPreviewUrl); wizardPreviewUrl=null; }
+}
+document.getElementById('closeWizard').addEventListener('click', closeWizard);
+
+function setWizardSourceMode(mode){
+  wizardAudioSourceMode=mode;
+  document.getElementById('wSrcFileBtn').classList.toggle('active', mode==='file');
+  document.getElementById('wSrcLinkBtn').classList.toggle('active', mode==='link');
+  document.getElementById('wAudioFileWrap').classList.toggle('hidden', mode!=='file');
+  document.getElementById('wAudioLinkWrap').classList.toggle('hidden', mode!=='link');
+}
+document.getElementById('wSrcFileBtn').addEventListener('click', ()=>setWizardSourceMode('file'));
+document.getElementById('wSrcLinkBtn').addEventListener('click', ()=>setWizardSourceMode('link'));
+document.getElementById('wAudio').addEventListener('change', ()=>{
+  const f = document.getElementById('wAudio').files[0];
+  if(!f) return;
+  if(wizardPreviewUrl) URL.revokeObjectURL(wizardPreviewUrl);
+  wizardPreviewUrl = URL.createObjectURL(f);
+  document.getElementById('wAudioPreview').src = wizardPreviewUrl;
+});
+document.getElementById('wAudioLink').addEventListener('change', ()=>{
+  const url = document.getElementById('wAudioLink').value.trim();
+  if(url) document.getElementById('wAudioPreview').src = url;
+});
+
+async function renderCategoryChipsInWizard(current){
+  const cats = await getAllCategories();
+  const wrap = document.getElementById('wCategoryChips');
+  wrap.innerHTML='';
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(c===current?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{
+      wizardSelectedCategory=c;
+      document.getElementById('wCategoryCustom').value='';
+      renderCategoryChipsInWizard(c);
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('wCategoryCustom').addEventListener('input', ()=>{
+  if(document.getElementById('wCategoryCustom').value.trim()){
+    wizardSelectedCategory='';
+    renderCategoryChipsInWizard(null);
+  }
+});
+document.getElementById('wImages').addEventListener('change', ()=>{
+  const n = document.getElementById('wImages').files.length;
+  document.getElementById('wImagesNote').textContent = n ? n+' file(s) selected (PDF pages expand automatically)' : '';
+});
+
+function showWizardStep(i){
+  wizardIndex = i;
+  document.getElementById('wAudioPreview').pause();
+  wizardSteps.forEach((id,idx)=>{
+    document.getElementById(id).classList.toggle('active', idx===i);
+  });
+  const dots = document.getElementById('wizardDots');
+  dots.innerHTML = wizardSteps.map((_,idx)=>`<span class="${idx===i?'active':''}"></span>`).join('');
+  document.getElementById('wBackBtn').classList.toggle('hidden', i===0);
+  document.getElementById('wNextBtn').classList.toggle('hidden', i===wizardSteps.length-1);
+  document.getElementById('wSaveBtn').classList.toggle('hidden', i!==wizardSteps.length-1);
+  if(i===wizardSteps.length-1) renderWizardReview();
+}
+function renderWizardReview(){
+  const title = document.getElementById('wTitle').value.trim() || '(untitled)';
+  const cat = document.getElementById('wCategoryCustom').value.trim() || wizardSelectedCategory || '(none)';
+  const month = document.getElementById('wMonth').value || '(none)';
+  const cel = document.getElementById('wCelebration').value.trim() || '(none)';
+  const audioInfo = wizardAudioSourceMode==='link'
+    ? (document.getElementById('wAudioLink').value.trim() ? 'Streaming link' : 'No audio yet')
+    : (document.getElementById('wAudio').files[0] ? document.getElementById('wAudio').files[0].name : 'No audio yet');
+  document.getElementById('wReviewBox').innerHTML = `
+    <div><b>${escapeHtml(title)}</b></div>
+    <div style="color:var(--ink-soft); margin-top:4px;">Category: ${escapeHtml(cat)}</div>
+    <div style="color:var(--ink-soft);">Month: ${escapeHtml(month)} · Celebration: ${escapeHtml(cel)}</div>
+    <div style="color:var(--ink-soft);">Audio: ${escapeHtml(audioInfo)}</div>
+  `;
+}
+document.getElementById('wNextBtn').addEventListener('click', ()=>{
+  if(wizardIndex===1 && !document.getElementById('wTitle').value.trim()){
+    toast('Give it a title first'); return;
+  }
+  showWizardStep(Math.min(wizardSteps.length-1, wizardIndex+1));
+});
+document.getElementById('wBackBtn').addEventListener('click', ()=>{
+  showWizardStep(Math.max(0, wizardIndex-1));
+});
+document.getElementById('wSaveBtn').addEventListener('click', saveWizardHymn);
+
+async function saveWizardHymn(){
+  const title = document.getElementById('wTitle').value.trim();
+  if(!title){ toast('Give it a title first'); showWizardStep(1); return; }
+  const customCat = document.getElementById('wCategoryCustom').value.trim();
+  const category = customCat || wizardSelectedCategory || '';
+  if(customCat) await addCustomCategory(customCat);
+  const month = document.getElementById('wMonth').value;
+  const celebration = document.getElementById('wCelebration').value.trim();
+  const tags = document.getElementById('wTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const audioFile = document.getElementById('wAudio').files[0];
+  const audioLink = document.getElementById('wAudioLink').value.trim();
+  const imageFiles = Array.from(document.getElementById('wImages').files);
+
+  const hymn = {
+    id: uid(), title, category, month, celebration, tags, favorite:false,
+    audioType:'file', audioId:null, audioUrl:null, offlineId:null,
+    images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
+    stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+
+  if(wizardAudioSourceMode==='link' && audioLink){
+    hymn.audioType='link'; hymn.audioUrl=audioLink;
+  } else if(audioFile || wizardIncomingFile){
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob: audioFile || wizardIncomingFile});
+    hymn.audioType='file'; hymn.audioId=mediaId;
+  }
+  const expandedImages = await expandLyricFiles(imageFiles);
+  for(const f of expandedImages){
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob:f});
+    hymn.images.push({id:mediaId, order:hymn.images.length});
+  }
+
+  await dbPut('hymns', hymn);
+  closeWizard();
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Hymn added');
+  if(hymn.audioType==='link' && hymn.audioUrl){
+    downloadOffline(hymn.id); // fire-and-forget so it doesn't block the UI; shows its own toasts
+  }
+}
+
+let audioSourceMode='file';
+function setAudioSourceMode(mode){
+  audioSourceMode=mode;
+  document.getElementById('srcFileBtn').classList.toggle('active', mode==='file');
+  document.getElementById('srcLinkBtn').classList.toggle('active', mode==='link');
+  document.getElementById('audioFileWrap').classList.toggle('hidden', mode!=='file');
+  document.getElementById('audioLinkWrap').classList.toggle('hidden', mode!=='link');
+}
+document.getElementById('srcFileBtn').addEventListener('click', ()=>setAudioSourceMode('file'));
+document.getElementById('srcLinkBtn').addEventListener('click', ()=>setAudioSourceMode('link'));
+
+/* ---- category presets: built-in genre terms + anything custom you've typed before ---- */
+async function getAllCategories(){
+  const rec = await dbGet('meta','customCategories');
+  const custom = (rec && rec.list) || [];
+  const used = Array.from(new Set(hymns.map(h=>h.category).filter(Boolean)));
+  return Array.from(new Set([...DEFAULT_CATEGORY_PRESETS, ...custom, ...used]));
+}
+async function addCustomCategory(cat){
+  if(!cat) return;
+  let rec = await dbGet('meta','customCategories');
+  if(!rec) rec = {key:'customCategories', list:[]};
+  if(!rec.list.includes(cat)) rec.list.push(cat);
+  await dbPut('meta', rec);
+}
+function populateMonthSelect(selectEl){
+  selectEl.innerHTML = '<option value="">— None —</option>' + ETHIOPIAN_MONTHS.map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+function populateCelebrationSuggestions(){
+  document.getElementById('celebrationSuggestions').innerHTML = CELEBRATION_SUGGESTIONS.map(c=>`<option value="${escapeHtml(c)}">`).join('');
+}
+
+let modalSelectedCategory='';
+async function renderCategoryChipsInModal(current){
+  const cats = await getAllCategories();
+  const wrap = document.getElementById('fCategoryChips');
+  wrap.innerHTML='';
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(c===current?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{
+      modalSelectedCategory = c;
+      document.getElementById('fCategoryCustom').value='';
+      renderCategoryChipsInModal(c);
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('fCategoryCustom').addEventListener('input', ()=>{
+  if(document.getElementById('fCategoryCustom').value.trim()){
+    modalSelectedCategory='';
+    renderCategoryChipsInModal(null);
+  }
+});
+
+async function renderCurrentImagesGallery(h){
+  const wrap = document.getElementById('currentImagesGallery');
+  wrap.innerHTML='';
+  for(const img of (h.images||[])){
+    const url = await urlFor(img.id);
+    const cell = document.createElement('div');
+    cell.className='thumb-wrap';
+    cell.innerHTML = `<img src="${url||''}" alt=""><button class="thumb-del" data-id="${img.id}">✕</button>`;
+    cell.querySelector('.thumb-del').addEventListener('click', async ()=>{
+      if(!confirm('Remove this lyric image?')) return;
+      const hymn = await dbGet('hymns', editingHymnId);
+      hymn.images = hymn.images.filter(x=>x.id!==img.id);
+      await dbPut('hymns', hymn);
+      await dbDelete('media', img.id).catch(()=>{});
+      await loadHymns();
+      await renderCurrentImagesGallery(hymn);
+      document.getElementById('currentImagesNote').textContent = hymn.images.length ? hymn.images.length+' lyric image(s) attached — tap ✕ to remove one, or add more below.' : 'No lyric images yet.';
+      renderLibrary();
+      toast('Image removed');
+    });
+    wrap.appendChild(cell);
+  }
+}
+
+async function openEditModal(id){
+  const h = await dbGet('hymns', id);
+  if(!h) return;
+  editingHymnId = id;
+  document.getElementById('modalTitle').textContent = 'Edit hymn';
+  document.getElementById('fTitle').value = h.title;
+  modalSelectedCategory = h.category||'';
+  document.getElementById('fCategoryCustom').value='';
+  await renderCategoryChipsInModal(h.category||'');
+  populateMonthSelect(document.getElementById('fMonth'));
+  document.getElementById('fMonth').value = h.month||'';
+  populateCelebrationSuggestions();
+  document.getElementById('fCelebration').value = h.celebration||'';
+  document.getElementById('fTags').value = (h.tags||[]).join(', ');
+  document.getElementById('fAudio').value='';
+  document.getElementById('fAudioLink').value = h.audioUrl||'';
+  document.getElementById('fImages').value='';
+  setAudioSourceMode(h.audioType==='link' ? 'link' : 'file');
+  const offlineNote = h.audioType==='link' ? (h.offlineId ? ' <span class="offline-badge">Downloaded</span>' : '') : '';
+  document.getElementById('currentAudioNote').innerHTML = h.audioType==='link'
+    ? ('Streaming from link.'+offlineNote)
+    : (h.audioId ? 'Audio file already attached — choose a new file to replace it.' : 'No audio attached yet.');
+  document.getElementById('currentImagesNote').textContent = (h.images&&h.images.length) ? h.images.length+' lyric image(s) attached — tap ✕ to remove one, or add more below.' : 'No lyric images yet.';
+  await renderCurrentImagesGallery(h);
+  document.getElementById('deleteHymn').classList.remove('hidden');
+  const dlBtn = document.getElementById('downloadOfflineBtn');
+  if(h.audioType==='link' && h.audioUrl){
+    dlBtn.classList.remove('hidden');
+    dlBtn.textContent = h.offlineId ? 'Re-download for offline' : 'Download for offline';
+    dlBtn.onclick = ()=>downloadOffline(h.id);
+  } else {
+    dlBtn.classList.add('hidden');
+  }
+  document.getElementById('hymnModalBackdrop').classList.add('active');
+}
+
+const EXT_BY_MIME = {
+  'audio/mpeg':'mp3', 'audio/mp3':'mp3', 'audio/mp4':'m4a', 'audio/x-m4a':'m4a',
+  'audio/ogg':'ogg', 'audio/wav':'wav', 'audio/x-wav':'wav', 'audio/webm':'webm', 'audio/aac':'aac'
+};
+function sanitizeFilenamePart(s){
+  return (s||'').replace(/[\\/:*?"<>|]/g,'').trim() || 'Untitled';
+}
+function getFileSaverPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AudioFileSaver){
+      return window.Capacitor.Plugins.AudioFileSaver;
+    }
+  }catch(e){}
+  return null;
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(String(r.result).split(',')[1] || '');
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+let fileAccessGranted = false;
+/* Asks the native side for storage access. On Android 10+ this is a no-op
+   (modern scoped storage doesn't need it for this use case) — on older
+   Android it triggers the real storage-permission prompt. In a plain
+   browser (no native plugin) it just resolves true and downloads fall
+   back to the browser's own download mechanism. */
+async function ensureFileAccess(){
+  const plugin = getFileSaverPlugin();
+  if(!plugin){ return true; }
+  if(fileAccessGranted) return true;
+  try{
+    const res = await plugin.requestAccess();
+    fileAccessGranted = !!(res && res.granted);
+    if(!fileAccessGranted) toast('Storage access was not granted');
+    return fileAccessGranted;
+  }catch(e){
+    toast('Could not request storage access');
+    return false;
+  }
+}
+/* Saves a blob via the native plugin into Music/Yared music/<month>/<celebration>[/<extraSub>]/<title>.<ext>,
+   falling back to a plain browser download (best-effort path hint only)
+   when the native plugin isn't available. */
+async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
+  const ext = EXT_BY_MIME[blob.type] || 'mp3';
+  const filename = `${sanitizeFilenamePart(title)}.${ext}`;
+  const subPath = [sanitizeFilenamePart(month||'Unsorted'), sanitizeFilenamePart(celebration||'Uncategorized'), extraSub?sanitizeFilenamePart(extraSub):null]
+    .filter(Boolean).join('/');
+
+  const plugin = getFileSaverPlugin();
+  if(plugin){
+    const ok = await ensureFileAccess();
+    if(!ok) return;
+    toast('Saving…');
+    try{
+      const data = await blobToBase64(blob);
+      const result = await plugin.save({data, filename, subPath, mimeType: blob.type||'audio/mpeg'});
+      toast(result && result.path ? 'Saved to Music/Yared music/'+subPath : 'Saved');
+    }catch(err){
+      toast('Could not save file: '+(err && err.message ? err.message : 'unknown error'));
+    }
+    return;
+  }
+
+  // Browser fallback — no real folder guarantee, see caveat in prior notes.
+  const path = `${subPath}/${filename}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = path;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  toast('Downloading…');
+}
+async function downloadHymnAudio(hymnId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  let blob=null;
+  try{
+    if(h.offlineId){ const rec = await dbGet('media', h.offlineId); blob = rec && rec.blob; }
+    if(!blob && h.audioType==='file' && h.audioId){ const rec = await dbGet('media', h.audioId); blob = rec && rec.blob; }
+    if(!blob && h.audioType==='link' && h.audioUrl){
+      toast('Fetching audio…');
+      const resp = await fetch(h.audioUrl);
+      if(!resp.ok) throw new Error('bad response');
+      blob = await resp.blob();
+    }
+  }catch(err){
+    toast('Could not fetch this audio — opening the link instead');
+    if(h.audioUrl) window.open(h.audioUrl, '_blank');
+    return;
+  }
+  if(!blob){ toast('No audio attached to this hymn'); return; }
+  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title});
+}
+async function downloadRecording(hymnId, recordingId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  const rec = (h.recordings||[]).find(r=>r.id===recordingId);
+  if(!rec) return;
+  const mediaRec = await dbGet('media', rec.mediaId);
+  if(!mediaRec || !mediaRec.blob){ toast('Recording not found'); return; }
+  await saveAudioToDevice(mediaRec.blob, {
+    month:h.month, celebration:h.celebration, extraSub:'Recording',
+    title: `${h.title} - ${rec.label}`
+  });
+}
+
+/* ============================================================
+   SHARE — uses the official @capacitor/share + @capacitor/filesystem
+   plugins. Link-based hymns share the link directly; local files get
+   written to the app's cache dir first (Capacitor's built-in
+   FileProvider handles turning that into a shareable content:// URI).
+   Falls back to the browser's Web Share API when not in the native app.
+   ============================================================ */
+function getSharePlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share){
+      return window.Capacitor.Plugins.Share;
+    }
+  }catch(e){}
+  return null;
+}
+function getFilesystemPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+      return window.Capacitor.Plugins.Filesystem;
+    }
+  }catch(e){}
+  return null;
+}
+async function shareHymn(hymnId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  const sharePlugin = getSharePlugin();
+
+  if(!sharePlugin){
+    if(navigator.share){
+      try{
+        await navigator.share({
+          title: h.title,
+          text: `${h.title} — Yared Hymn Tracker`,
+          url: h.audioType==='link' ? h.audioUrl : undefined
+        });
+      }catch(e){}
+    } else {
+      toast('Sharing needs the installed app');
+    }
+    return;
+  }
+
+  if(h.audioType==='link' && h.audioUrl){
+    try{
+      await sharePlugin.share({title:h.title, text:`${h.title} — shared from Yared Hymn Tracker`, url:h.audioUrl, dialogTitle:'Share hymn'});
+    }catch(e){}
+    return;
+  }
+
+  let blob=null;
+  if(h.offlineId){ const rec=await dbGet('media', h.offlineId); blob=rec&&rec.blob; }
+  if(!blob && h.audioId){ const rec=await dbGet('media', h.audioId); blob=rec&&rec.blob; }
+  if(!blob){ toast('No audio to share'); return; }
+
+  const fsPlugin = getFilesystemPlugin();
+  if(!fsPlugin){ toast('Could not share this file'); return; }
+  try{
+    toast('Preparing to share…');
+    const base64 = await blobToBase64(blob);
+    const ext = EXT_BY_MIME[blob.type] || 'mp3';
+    const filename = sanitizeFilenamePart(h.title)+'.'+ext;
+    const writeRes = await fsPlugin.writeFile({path:filename, data:base64, directory:'CACHE'});
+    await sharePlugin.share({title:h.title, text:`${h.title} — shared from Yared Hymn Tracker`, files:[writeRes.uri], dialogTitle:'Share hymn'});
+  }catch(err){
+    toast('Could not share: '+(err && err.message ? err.message : 'unknown error'));
+  }
+}
+document.getElementById('shareHymnBtn').addEventListener('click', ()=>{
+  if(editingHymnId) shareHymn(editingHymnId);
+});
+
+async function downloadOffline(hymnId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h || !h.audioUrl) return;
+  toast('Downloading...');
+  try{
+    const resp = await fetch(h.audioUrl);
+    if(!resp.ok) throw new Error('bad response');
+    const blob = await resp.blob();
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob});
+    h.offlineId = mediaId;
+    await dbPut('hymns', h);
+    toast('Downloaded for offline use');
+    if(currentHymn && currentHymn.id===hymnId) currentHymn = h;
+    if(editingHymnId===hymnId) openEditModal(hymnId);
+  }catch(err){
+    toast('Could not download this link (site may block direct downloads)');
+  }
+}
+function closeModal(){ document.getElementById('hymnModalBackdrop').classList.remove('active'); editingHymnId=null; }
+document.getElementById('closeModal').addEventListener('click', closeModal);
+document.getElementById('addHymnFab').addEventListener('click', openAddWizard);
+document.getElementById('saveHymn').addEventListener('click', saveHymnFromForm);
+document.getElementById('deleteHymn').addEventListener('click', ()=>{ if(editingHymnId && confirm('Delete this hymn?')) deleteHymnById(editingHymnId); });
+
+async function toggleFavorite(id, ev){
+  ev.stopPropagation();
+  const h = await dbGet('hymns', id);
+  h.favorite = !h.favorite;
+  await dbPut('hymns', h);
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+}
+
+/* ============================================================
+   LIBRARY RENDER
+   ============================================================ */
+let activeCategory = null;
+let activeMonth = null;
+function renderCategoryChips(){
+  const cats = Array.from(new Set(hymns.map(h=>h.category).filter(Boolean)));
+  const wrap = document.getElementById('categoryChips');
+  wrap.innerHTML='';
+  const allChip = document.createElement('span');
+  allChip.className='chip'+(activeCategory===null?' active':'');
+  allChip.textContent='All';
+  allChip.onclick=()=>{activeCategory=null; renderLibrary();};
+  wrap.appendChild(allChip);
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(activeCategory===c?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{activeCategory=(activeCategory===c?null:c); renderLibrary();};
+    wrap.appendChild(chip);
+  });
+}
+function renderMonthChips(){
+  const months = ETHIOPIAN_MONTHS.filter(m=> hymns.some(h=>h.month===m));
+  const wrap = document.getElementById('monthChips');
+  wrap.innerHTML='';
+  if(!months.length){ activeMonth=null; return; }
+  const allChip = document.createElement('span');
+  allChip.className='chip'+(activeMonth===null?' active':'');
+  allChip.textContent='Any month';
+  allChip.onclick=()=>{activeMonth=null; renderLibrary();};
+  wrap.appendChild(allChip);
+  months.forEach(m=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(activeMonth===m?' active':'');
+    chip.textContent=m;
+    chip.onclick=()=>{activeMonth=(activeMonth===m?null:m); renderLibrary();};
+    wrap.appendChild(chip);
+  });
+}
+function renderLibrary(){
+  renderCategoryChips();
+  renderMonthChips();
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  let list = hymns.filter(h=>{
+    if(activeCategory && h.category!==activeCategory) return false;
+    if(activeMonth && h.month!==activeMonth) return false;
+    if(q && !(h.title.toLowerCase().includes(q) || (h.tags||[]).join(' ').toLowerCase().includes(q)
+        || (h.celebration||'').toLowerCase().includes(q) || (h.month||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const container = document.getElementById('libraryList');
+  container.innerHTML='';
+  if(!list.length){
+    container.innerHTML = '<div class="empty-state"><div class="big">🎼</div>No hymns match. Tap + to add one.</div>';
+    return;
+  }
+  list.forEach(h=>{
+    const row = document.createElement('div');
+    row.className='hymn-row'+(selectMode?' selectable':'');
+    const statusKey = (h.stats && h.stats.status) || 'new';
+    const statusDef = STATUS_DEFS[statusKey];
+    const subParts = [h.category||'Uncategorized'];
+    if(h.duration) subParts.push(fmtTime(h.duration));
+    if(h.celebration) subParts.push(h.celebration);
+    const metaHtml = `
+      <div class="meta">
+        <div class="t"><span class="status-dot" style="background:${statusDef.color}" title="${statusDef.label}"></span>${escapeHtml(h.title)}</div>
+        <div class="s">${escapeHtml(subParts.join(' · '))}</div>
+      </div>`;
+    if(selectMode){
+      const checked = selectedHymnIds.has(h.id);
+      row.innerHTML = `
+        <div class="select-check${checked?' checked':''}">✓</div>
+        ${metaHtml}
+      `;
+      row.addEventListener('click', ()=> toggleHymnSelection(h.id));
+    } else {
+      row.innerHTML = `
+        <div class="thumb">${h.title.charAt(0).toUpperCase()}</div>
+        ${metaHtml}
+        <button class="icon-btn" data-action="download" style="width:32px;height:32px; flex-shrink:0;" title="Download audio">⇩</button>
+        <button class="icon-btn" data-action="queue" style="width:32px;height:32px; flex-shrink:0;" title="Add to queue">+Q</button>
+        <button class="fav ${h.favorite?'on':''}">${h.favorite?'♥':'♡'}</button>
+      `;
+      row.querySelector('[data-action=queue]').addEventListener('click', (e)=>{ e.stopPropagation(); addToQueue(h.id); });
+      row.querySelector('[data-action=download]').addEventListener('click', (e)=>{ e.stopPropagation(); downloadHymnAudio(h.id); });
+      row.querySelector('.fav').addEventListener('click', (e)=>toggleFavorite(h.id,e));
+      row.addEventListener('click', ()=>openEditModal(h.id));
+      row.addEventListener('dblclick', ()=>loadHymnIntoPlayer(h.id, list.map(x=>x.id)));
+      row.querySelector('.thumb').addEventListener('click',(e)=>{ e.stopPropagation(); loadHymnIntoPlayer(h.id, list.map(x=>x.id)); showScreen('player'); });
+    }
+    container.appendChild(row);
+  });
+}
+document.getElementById('searchInput').addEventListener('input', renderLibrary);
+
+/* ============================================================
+   BULK SELECT
+   ============================================================ */
+let selectMode = false;
+let selectedHymnIds = new Set();
+function updateBulkBar(){
+  document.getElementById('bulkBar').classList.toggle('hidden', !selectMode || selectedHymnIds.size===0);
+  document.getElementById('bulkCount').textContent = selectedHymnIds.size+' selected';
+}
+function toggleHymnSelection(id){
+  if(selectedHymnIds.has(id)) selectedHymnIds.delete(id); else selectedHymnIds.add(id);
+  updateBulkBar();
+  renderLibrary();
+}
+document.getElementById('toggleSelectMode').addEventListener('click', ()=>{
+  selectMode = !selectMode;
+  selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.toggle('on', selectMode);
+  updateBulkBar();
+  renderLibrary();
+});
+document.getElementById('bulkCancel').addEventListener('click', ()=>{
+  selectMode=false; selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.remove('on');
+  updateBulkBar();
+  renderLibrary();
+});
+document.getElementById('bulkDelete').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  if(!confirm(`Delete ${selectedHymnIds.size} hymn(s)? This can't be undone.`)) return;
+  for(const id of selectedHymnIds){
+    await dbDelete('hymns', id);
+  }
+  selectMode=false; selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.remove('on');
+  await loadHymns();
+  updateBulkBar();
+  renderLibrary();
+  renderHome();
+  toast('Deleted');
+});
+document.getElementById('bulkSetCategory').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const cats = await getAllCategories();
+  const label = prompt('Set category for '+selectedHymnIds.size+' hymn(s):\n('+cats.join(', ')+')', cats[0]||'');
+  if(label==null) return;
+  if(label && !DEFAULT_CATEGORY_PRESETS.includes(label)) await addCustomCategory(label);
+  for(const id of selectedHymnIds){
+    const h = await dbGet('hymns', id);
+    if(h){ h.category=label; await dbPut('hymns', h); }
+  }
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Category updated');
+});
+document.getElementById('bulkFavorite').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  for(const id of selectedHymnIds){
+    const h = await dbGet('hymns', id);
+    if(h){ h.favorite = true; await dbPut('hymns', h); }
+  }
+  await loadHymns();
+  renderLibrary();
+  renderHome();
+  toast('Marked as favorite');
+});
+document.getElementById('bulkQueue').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const ids = await getPersistentQueue();
+  for(const id of selectedHymnIds){
+    if(!ids.includes(id)) ids.push(id);
+  }
+  await setPersistentQueue(ids);
+  toast('Added to queue');
+});
+document.getElementById('bulkShare').addEventListener('click', async ()=>{
+  if(!selectedHymnIds.size) return;
+  const sharePlugin = getSharePlugin();
+  const ids = Array.from(selectedHymnIds);
+  if(!sharePlugin){
+    // Browser fallback: share a plain text list, since multi-file sharing needs the native plugin.
+    const titles = [];
+    for(const id of ids){ const h = await dbGet('hymns', id); if(h) titles.push(h.title); }
+    if(navigator.share){
+      try{ await navigator.share({title:'Hymns from Yared Hymn Tracker', text: titles.join('\n')}); }catch(e){}
+    } else {
+      toast('Sharing needs the installed app');
+    }
+    return;
+  }
+  toast('Preparing to share…');
+  const fsPlugin = getFilesystemPlugin();
+  const fileUris = [];
+  const linkUrls = [];
+  for(const id of ids){
+    const h = await dbGet('hymns', id);
+    if(!h) continue;
+    if(h.audioType==='link' && h.audioUrl){
+      linkUrls.push(`${h.title}: ${h.audioUrl}`);
+      continue;
+    }
+    let blob=null;
+    if(h.offlineId){ const rec=await dbGet('media', h.offlineId); blob=rec&&rec.blob; }
+    if(!blob && h.audioId){ const rec=await dbGet('media', h.audioId); blob=rec&&rec.blob; }
+    if(!blob || !fsPlugin) continue;
+    try{
+      const base64 = await blobToBase64(blob);
+      const ext = EXT_BY_MIME[blob.type] || 'mp3';
+      const writeRes = await fsPlugin.writeFile({path: sanitizeFilenamePart(h.title)+'.'+ext, data:base64, directory:'CACHE'});
+      fileUris.push(writeRes.uri);
+    }catch(e){}
+  }
+  try{
+    await sharePlugin.share({
+      title:'Hymns from Yared Hymn Tracker',
+      text: linkUrls.length ? linkUrls.join('\n') : undefined,
+      files: fileUris.length ? fileUris : undefined,
+      dialogTitle:'Share hymns'
+    });
+  }catch(e){
+    toast('Could not share: '+(e && e.message ? e.message : 'unknown error'));
+  }
+});
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(sec){
+  if(!isFinite(sec)||sec<0) sec=0;
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return m+':'+String(s).padStart(2,'0');
+}
+
+/* ============================================================
+   HOME SCREEN
+   ============================================================ */
+async function renderHome(){
+  refreshQueueSummary();
+  const streak = await calcCurrentStreak();
+  const streakBadge = document.getElementById('streakBadge');
+  if(streak>0){
+    document.getElementById('streakVal').textContent = streak;
+    streakBadge.classList.remove('hidden');
+  } else {
+    streakBadge.classList.add('hidden');
+  }
+  // continue card
+  const meta = await dbGet('meta','lastPlayed');
+  const cc = document.getElementById('continueCard');
+  if(meta && meta.hymnId){
+    const h = hymns.find(x=>x.id===meta.hymnId);
+    if(h){
+      cc.innerHTML = `<div class="card" style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(h.title)}</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">${fmtTime(h.lastPosition||0)} / ${fmtTime(h.duration||0)}</div>
+        </div>
+        <button class="btn" id="resumeBtn">Resume</button>
+      </div>`;
+      document.getElementById('resumeBtn').addEventListener('click', ()=>{ loadHymnIntoPlayer(h.id,[h.id]); showScreen('player'); });
+    } else cc.innerHTML='';
+  } else {
+    cc.innerHTML = '<div class="card" style="color:var(--ink-soft); font-size:13px;">No hymn played yet. Add one from the Library.</div>';
+  }
+
+  // revision count
+  const now = Date.now();
+  const due = hymns.filter(h=> h.stats && h.stats.dueAt!=null && h.stats.dueAt<=now);
+  document.getElementById('revisionCount').textContent = due.length ? due.length+' hymn(s) due today' : 'Nothing due today';
+  nativeUpdateDueInfo(due);
+
+  // backup nudge
+  const backupRec = await dbGet('meta','lastBackupAt');
+  const lastBackupAt = backupRec ? backupRec.value : null;
+  const daysSince = lastBackupAt ? Math.floor((Date.now()-lastBackupAt)/86400000) : null;
+  const nudge = document.getElementById('backupNudge');
+  if(hymns.length && (daysSince===null || daysSince>=14)){
+    nudge.style.display='flex';
+    document.getElementById('backupNudgeText').textContent = lastBackupAt ? `Last backup: ${daysSince} day(s) ago` : 'You have never backed up your data';
+  } else {
+    nudge.style.display='none';
+  }
+
+  // recent
+  const recent = hymns.slice(0,5);
+  const rl = document.getElementById('recentList');
+  rl.innerHTML='';
+  if(!recent.length){
+    rl.innerHTML = '<div class="empty-state"><div class="big">📖</div>Your library is empty. Tap + to add your first hymn.</div>';
+  } else {
+    recent.forEach(h=>{
+      const row=document.createElement('div');
+      row.className='hymn-row';
+      row.innerHTML = `<div class="thumb">${h.title.charAt(0).toUpperCase()}</div>
+        <div class="meta"><div class="t">${escapeHtml(h.title)}</div><div class="s">${escapeHtml(h.category||'Uncategorized')}</div></div>`;
+      row.addEventListener('click', ()=>{ loadHymnIntoPlayer(h.id, recent.map(x=>x.id)); showScreen('player'); });
+      rl.appendChild(row);
+    });
+  }
+}
+document.getElementById('backupNudgeBtn').addEventListener('click', exportAllData);
+
+/* ============================================================
+   DAILY PRACTICE REMINDER — native notification, scheduled via a
+   small custom plugin (added by the GitHub Actions build). No-ops
+   harmlessly outside the built app.
+   ============================================================ */
+function getReminderPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Reminder){
+      return window.Capacitor.Plugins.Reminder;
+    }
+  }catch(e){}
+  return null;
+}
+function nativeUpdateDueInfo(dueList){
+  const plugin = getReminderPlugin();
+  if(!plugin) return;
+  const titles = dueList.slice(0,5).map(h=>h.title);
+  plugin.updateDueInfo({count: dueList.length, titles}).catch(()=>{});
+}
+function populateReminderTimeSelects(){
+  const hourSel = document.getElementById('reminderHour');
+  const minSel = document.getElementById('reminderMinute');
+  if(!hourSel.options.length){
+    for(let h=0; h<24; h++){
+      const opt=document.createElement('option'); opt.value=h;
+      const h12 = h%12===0?12:h%12; const ampm = h<12?'AM':'PM';
+      opt.textContent = `${h12}:00 ${ampm}`; hourSel.appendChild(opt);
+    }
+  }
+  if(!minSel.options.length){
+    [0,15,30,45].forEach(m=>{
+      const opt=document.createElement('option'); opt.value=m; opt.textContent=String(m).padStart(2,'0'); minSel.appendChild(opt);
+    });
+  }
+}
+async function loadReminderSettings(){
+  populateReminderTimeSelects();
+  const rec = await dbGet('meta','reminderSettings');
+  const settings = rec ? rec.value : {enabled:false, hour:9, minute:0};
+  document.getElementById('reminderEnabled').checked = !!settings.enabled;
+  document.getElementById('reminderHour').value = settings.hour;
+  document.getElementById('reminderMinute').value = settings.minute;
+  document.getElementById('reminderTimeRow').style.opacity = settings.enabled ? '1' : '.5';
+}
+async function saveReminderSettings(){
+  const enabled = document.getElementById('reminderEnabled').checked;
+  const hour = parseInt(document.getElementById('reminderHour').value)||9;
+  const minute = parseInt(document.getElementById('reminderMinute').value)||0;
+  await dbPut('meta', {key:'reminderSettings', value:{enabled, hour, minute}});
+  document.getElementById('reminderTimeRow').style.opacity = enabled ? '1' : '.5';
+  const plugin = getReminderPlugin();
+  if(!plugin){ if(enabled) toast('Will take effect once built into the app'); return; }
+  try{
+    if(enabled) await plugin.schedule({hour, minute});
+    else await plugin.cancel();
+  }catch(e){ toast('Could not update reminder'); }
+}
+document.getElementById('reminderEnabled').addEventListener('change', saveReminderSettings);
+document.getElementById('reminderHour').addEventListener('change', saveReminderSettings);
+document.getElementById('reminderMinute').addEventListener('change', saveReminderSettings);
+
+document.getElementById('suggestedBtn').addEventListener('click', ()=>{
+  if(!hymns.length){ toast('Add a hymn first'); return; }
+  // suggested = least recently practiced, favorites weighted first
+  const sorted = [...hymns].sort((a,b)=>{
+    const fa = a.favorite?0:1, fb=b.favorite?0:1;
+    if(fa!==fb) return fa-fb;
+    return (a.stats?.lastPracticed||0)-(b.stats?.lastPracticed||0);
+  });
+  loadHymnIntoPlayer(sorted[0].id, sorted.map(x=>x.id));
+  showScreen('player');
+});
+document.getElementById('randomBtn').addEventListener('click', function(){
+  if(!hymns.length){ toast('Add a hymn first'); return; }
+  this.classList.remove('rolling'); void this.offsetWidth; this.classList.add('rolling');
+  const pick = hymns[Math.floor(Math.random()*hymns.length)];
+  setTimeout(()=>{
+    loadHymnIntoPlayer(pick.id, hymns.map(x=>x.id));
+    showScreen('player');
+  }, 220);
+});
+document.getElementById('goRevision').addEventListener('click', ()=>showScreen('revision'));
+
+/* ============================================================
+   REVISION SCREEN
+   ============================================================ */
+function renderRevisionScreen(){
+  const now = Date.now();
+  const due = hymns.filter(h=> h.stats && h.stats.dueAt!=null && h.stats.dueAt<=now)
+                    .sort((a,b)=>(a.stats.dueAt-b.stats.dueAt));
+  const el = document.getElementById('revisionList');
+  el.innerHTML='';
+  if(!due.length){
+    el.innerHTML = '<div class="empty-state"><div class="big">✅</div>Nothing due for review right now.</div>';
+    return;
+  }
+  due.forEach(h=>{
+    const row=document.createElement('div');
+    row.className='hymn-row';
+    const statusKey = (h.stats && h.stats.status) || 'new';
+    const statusDef = STATUS_DEFS[statusKey];
+    row.innerHTML = `<div class="thumb">${h.title.charAt(0).toUpperCase()}</div>
+      <div class="meta"><div class="t"><span class="status-dot" style="background:${statusDef.color}" title="${statusDef.label}"></span>${escapeHtml(h.title)}</div><div class="s">${statusDef.label} · practiced ${h.stats.practiceCount||0}x</div></div>`;
+    row.addEventListener('click', ()=>{ loadHymnIntoPlayer(h.id, due.map(x=>x.id)); showScreen('player'); });
+    el.appendChild(row);
+  });
+}
+
+// spaced repetition: call when a hymn is meaningfully practiced (played to completion or teacher/continuous session finished)
+async function markPracticed(hymnId){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  h.stats = h.stats || {lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'};
+  h.stats.practiceCount = (h.stats.practiceCount||0)+1;
+  h.stats.lastPracticed = Date.now();
+  // Note: revision scheduling (dueAt) is driven by the memorization-status
+  // buttons (setMemorizationStatus), not automatically by practice count.
+  await dbPut('hymns', h);
+  const idx = hymns.findIndex(x=>x.id===hymnId);
+  if(idx>-1) hymns[idx]=h;
+  if(currentHymn && currentHymn.id===hymnId) currentHymn = h;
+  await logPracticeEvent();
+}
+
+/* ============================================================
+   MEMORIZATION STATUS (Anki-style) — tapping a status sets when
+   the hymn is next due for revision, driving the Revision queue.
+   ============================================================ */
+async function setMemorizationStatus(hymnId, statusKey){
+  const def = STATUS_DEFS[statusKey];
+  if(!def) return;
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  h.stats = h.stats || {lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'};
+  h.stats.status = statusKey;
+  h.stats.intervalDays = def.days;
+  h.stats.dueAt = Date.now() + def.days*86400000;
+  h.stats.lastPracticed = Date.now();
+  await dbPut('hymns', h);
+  const idx = hymns.findIndex(x=>x.id===hymnId);
+  if(idx>-1) hymns[idx]=h;
+  if(currentHymn && currentHymn.id===hymnId) currentHymn = h;
+  await logPracticeEvent();
+  renderStatusRow();
+  toast(def.label+' — next review in '+def.days+' day(s)');
+}
+function renderStatusRow(){
+  const row = document.getElementById('statusRow');
+  if(!row || !currentHymn) return;
+  const current = (currentHymn.stats && currentHymn.stats.status) || 'new';
+  row.innerHTML='';
+  STATUS_ORDER.forEach(key=>{
+    const def = STATUS_DEFS[key];
+    const btn = document.createElement('button');
+    btn.className = 'status-btn'+(current===key?' active':'');
+    if(current===key) btn.style.background = def.color;
+    btn.innerHTML = `<span class="status-dot" style="background:${def.color}"></span>${def.label}`;
+    btn.addEventListener('click', ()=> setMemorizationStatus(currentHymn.id, key));
+    row.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   QUEUE (persistent practice queue, separate from ad-hoc navigation)
+   ============================================================ */
+async function getPersistentQueue(){
+  const rec = await dbGet('meta','persistentQueue');
+  return (rec && rec.ids) ? rec.ids : [];
+}
+async function setPersistentQueue(ids){
+  await dbPut('meta', {key:'persistentQueue', ids});
+}
+async function addToQueue(hymnId){
+  const ids = await getPersistentQueue();
+  if(!ids.includes(hymnId)) ids.push(hymnId);
+  await setPersistentQueue(ids);
+  toast('Added to queue');
+  renderHome();
+}
+async function removeFromQueue(idx){
+  const ids = await getPersistentQueue();
+  ids.splice(idx,1);
+  await setPersistentQueue(ids);
+  renderQueueScreen();
+}
+async function moveQueueItem(idx, delta){
+  const ids = await getPersistentQueue();
+  const j = idx+delta;
+  if(j<0 || j>=ids.length) return;
+  [ids[idx], ids[j]] = [ids[j], ids[idx]];
+  await setPersistentQueue(ids);
+  renderQueueScreen();
+}
+async function renderQueueScreen(){
+  const ids = await getPersistentQueue();
+  const el = document.getElementById('queueList');
+  el.innerHTML='';
+  if(!ids.length){
+    el.innerHTML = '<div class="empty-state"><div class="big">🗒️</div>Your queue is empty. Add hymns from the Library.</div>';
+    return;
+  }
+  ids.forEach((id,i)=>{
+    const h = hymns.find(x=>x.id===id);
+    if(!h) return;
+    const row = document.createElement('div');
+    row.className='queue-item';
+    row.innerHTML = `<span class="t">${escapeHtml(h.title)}</span>
+      <button class="mini-btn" data-a="up">↑</button>
+      <button class="mini-btn" data-a="down">↓</button>
+      <button class="mini-btn" data-a="remove">✕</button>`;
+    row.querySelector('[data-a=up]').addEventListener('click', ()=>moveQueueItem(i,-1));
+    row.querySelector('[data-a=down]').addEventListener('click', ()=>moveQueueItem(i,1));
+    row.querySelector('[data-a=remove]').addEventListener('click', ()=>removeFromQueue(i));
+    el.appendChild(row);
+  });
+}
+document.getElementById('playQueueBtn').addEventListener('click', async ()=>{
+  const ids = await getPersistentQueue();
+  if(!ids.length){ toast('Queue is empty'); return; }
+  await loadHymnIntoPlayer(ids[0], ids);
+  audio.play();
+  showScreen('player');
+});
+document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
+document.getElementById('clearQueueBtn').addEventListener('click', async ()=>{
+  await setPersistentQueue([]);
+  renderQueueScreen();
+});
+async function refreshQueueSummary(){
+  const ids = await getPersistentQueue();
+  document.getElementById('queueSummaryCount').textContent = ids.length ? ids.length+' hymn(s) queued' : 'Empty';
+}
+
+/* ============================================================
+   STATS + PRACTICE HEATMAP
+   ============================================================ */
+function dayKey(d){ return d.toISOString().slice(0,10); }
+async function logPracticeEvent(){
+  const rec = (await dbGet('meta','practiceLog')) || {key:'practiceLog', days:{}};
+  const k = dayKey(new Date());
+  rec.days[k] = (rec.days[k]||0)+1;
+  await dbPut('meta', rec);
+}
+async function calcCurrentStreak(){
+  const rec = (await dbGet('meta','practiceLog')) || {days:{}};
+  const days = rec.days||{};
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    if(days[dayKey(d)]) streak++; else break;
+  }
+  return streak;
+}
+async function renderStatsScreen(){
+  document.getElementById('statTotalHymns').textContent = hymns.length;
+  const totalPractices = hymns.reduce((s,h)=> s+(h.stats?.practiceCount||0), 0);
+  document.getElementById('statTotalPractices').textContent = totalPractices;
+
+  const rec = (await dbGet('meta','practiceLog')) || {days:{}};
+  const days = rec.days||{};
+
+  document.getElementById('statStreak').textContent = await calcCurrentStreak();
+
+  // heatmap: last 84 days, grid of 7 rows x 12 cols (columns = weeks)
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML='';
+  const totalDays=84;
+  const cells=[];
+  for(let i=totalDays-1;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    cells.push({date:d, count: days[dayKey(d)]||0});
+  }
+  cells.forEach(c=>{
+    const cell=document.createElement('div');
+    let lvl='';
+    if(c.count>=6) lvl='l4'; else if(c.count>=3) lvl='l3'; else if(c.count>=1) lvl='l2';
+    cell.className='heat-cell'+(lvl?' '+lvl:'');
+    cell.title = dayKey(c.date)+': '+c.count+' practice(s)';
+    grid.appendChild(cell);
+  });
+
+  // category totals
+  const catTotals = {};
+  hymns.forEach(h=>{
+    const cat = h.category || 'Uncategorized';
+    catTotals[cat] = (catTotals[cat]||0) + (h.stats?.practiceCount||0);
+  });
+  const maxCat = Math.max(1, ...Object.values(catTotals));
+  const catEl = document.getElementById('categoryStats');
+  catEl.innerHTML='';
+  Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).forEach(([cat,count])=>{
+    const row=document.createElement('div');
+    row.className='stat-bar-row';
+    row.innerHTML = `<span class="lbl">${escapeHtml(cat)}</span>
+      <span class="stat-bar-track"><span class="stat-bar-fill" style="width:${(count/maxCat*100)}%"></span></span>
+      <span class="stat-num">${count}</span>`;
+    catEl.appendChild(row);
+  });
+  if(!Object.keys(catTotals).length){
+    catEl.innerHTML = '<div class="empty-state" style="padding:20px;">No practice data yet.</div>';
+  }
+}
+
+/* ============================================================
+   BATCH ADD (paste "Title | link" lines, and/or pick local files)
+   ============================================================ */
+let batchFilesCategory='';
+async function renderBatchFilesCategoryChips(current){
+  const cats = await getAllCategories();
+  const wrap = document.getElementById('batchFilesCategoryChips');
+  wrap.innerHTML='';
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(c===current?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{
+      batchFilesCategory=c;
+      document.getElementById('batchFilesCategoryCustom').value='';
+      renderBatchFilesCategoryChips(c);
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('batchFilesCategoryCustom').addEventListener('input', ()=>{
+  if(document.getElementById('batchFilesCategoryCustom').value.trim()){
+    batchFilesCategory='';
+    renderBatchFilesCategoryChips(null);
+  }
+});
+document.getElementById('openBatchAdd').addEventListener('click', ()=>{
+  populateMonthSelect(document.getElementById('batchMonth'));
+  populateCelebrationSuggestions();
+  document.getElementById('batchMonth').value='';
+  document.getElementById('batchCelebration').value='';
+  document.getElementById('batchText').value='';
+  document.getElementById('batchFiles').value='';
+  document.getElementById('batchFilesCategoryCustom').value='';
+  batchFilesCategory='';
+  renderBatchFilesCategoryChips(null);
+  document.getElementById('batchModalBackdrop').classList.add('active');
+});
+document.getElementById('closeBatchModal').addEventListener('click', ()=>{
+  document.getElementById('batchModalBackdrop').classList.remove('active');
+});
+function filenameToTitle(name){
+  return name.replace(/\.[a-zA-Z0-9]+$/,'').replace(/[-_]+/g,' ').trim() || 'Untitled hymn';
+}
+document.getElementById('submitBatchAdd').addEventListener('click', ()=>{
+  const month = document.getElementById('batchMonth').value;
+  const celebration = document.getElementById('batchCelebration').value.trim();
+  const lines = document.getElementById('batchText').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const localFiles = Array.from(document.getElementById('batchFiles').files);
+  if(!lines.length && !localFiles.length){ toast('Paste some lines or pick local files first'); return; }
+
+  const filesCategory = document.getElementById('batchFilesCategoryCustom').value.trim() || batchFilesCategory || '';
+  const queue = [];
+
+  for(const line of lines){
+    let title, category='', url;
+    const parts = line.split('|').map(p=>p.trim());
+    if(parts.length>=3){
+      title = parts[0]; category = parts[1]; url = parts.slice(2).join('|').trim();
+    } else if(parts.length===2){
+      title = parts[0]; url = parts[1];
+    } else {
+      url = parts[0];
+      try{ title = decodeURIComponent(url.split('/').pop().split('?')[0].replace(/\.[a-zA-Z0-9]+$/,'').replace(/[-_]+/g,' ')) || 'Untitled hymn'; }
+      catch(e){ title='Untitled hymn'; }
+    }
+    if(!url) continue;
+    queue.push({title: title||'Untitled hymn', category, month, celebration, audioType:'link', audioUrl:url, audioFile:null});
+  }
+  for(const file of localFiles){
+    queue.push({title: filenameToTitle(file.name), category: filesCategory, month, celebration, audioType:'file', audioUrl:null, audioFile:file});
+  }
+
+  if(!queue.length){ toast('Nothing to review'); return; }
+  document.getElementById('batchModalBackdrop').classList.remove('active');
+  openBatchReview(queue);
+});
+
+/* ============================================================
+   BATCH REVIEW WIZARD — steps through each parsed/picked hymn one
+   at a time: preview the audio, adjust title/category, optionally
+   attach lyrics, then Add & Next (or Skip) before it's actually saved.
+   ============================================================ */
+let batchReviewQueue = [];
+let batchReviewIndex = 0;
+let batchReviewSelectedCategory = '';
+let batchReviewPreviewUrl = null;
+let batchReviewAddedCount = 0;
+
+async function openBatchReview(queue){
+  batchReviewQueue = queue;
+  batchReviewIndex = 0;
+  batchReviewAddedCount = 0;
+  document.getElementById('batchReviewBackdrop').classList.add('active');
+  await showBatchReviewItem();
+}
+function closeBatchReview(){
+  document.getElementById('batchReviewBackdrop').classList.remove('active');
+  document.getElementById('batchReviewPreview').pause();
+  if(batchReviewPreviewUrl){ URL.revokeObjectURL(batchReviewPreviewUrl); batchReviewPreviewUrl=null; }
+}
+document.getElementById('closeBatchReview').addEventListener('click', async ()=>{
+  closeBatchReview();
+  await loadHymns(); renderLibrary(); renderHome();
+  if(batchReviewAddedCount) toast(batchReviewAddedCount+' hymn(s) added');
+});
+
+async function showBatchReviewItem(){
+  const item = batchReviewQueue[batchReviewIndex];
+  document.getElementById('batchReviewPos').textContent = (batchReviewIndex+1)+' of '+batchReviewQueue.length;
+  document.getElementById('batchReviewTitle').value = item.title;
+  document.getElementById('batchReviewImages').value='';
+  document.getElementById('batchReviewImagesNote').textContent='';
+  batchReviewSelectedCategory = item.category || '';
+  await renderBatchReviewCategoryChips(batchReviewSelectedCategory);
+  document.getElementById('batchReviewCategoryCustom').value =
+    (batchReviewSelectedCategory && !(await getAllCategories()).includes(batchReviewSelectedCategory)) ? batchReviewSelectedCategory : '';
+
+  const preview = document.getElementById('batchReviewPreview');
+  preview.pause();
+  if(batchReviewPreviewUrl){ URL.revokeObjectURL(batchReviewPreviewUrl); batchReviewPreviewUrl=null; }
+  if(item.audioType==='file' && item.audioFile){
+    batchReviewPreviewUrl = URL.createObjectURL(item.audioFile);
+    preview.src = batchReviewPreviewUrl;
+  } else if(item.audioUrl){
+    preview.src = item.audioUrl;
+  } else {
+    preview.removeAttribute('src');
+  }
+
+  const addBtn = document.getElementById('batchReviewAdd');
+  addBtn.textContent = (batchReviewIndex===batchReviewQueue.length-1) ? 'Add & Finish' : 'Add & Next ›';
+}
+async function renderBatchReviewCategoryChips(current){
+  const cats = await getAllCategories();
+  const wrap = document.getElementById('batchReviewCategoryChips');
+  wrap.innerHTML='';
+  cats.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'+(c===current?' active':'');
+    chip.textContent=c;
+    chip.onclick=()=>{
+      batchReviewSelectedCategory=c;
+      document.getElementById('batchReviewCategoryCustom').value='';
+      renderBatchReviewCategoryChips(c);
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('batchReviewCategoryCustom').addEventListener('input', ()=>{
+  if(document.getElementById('batchReviewCategoryCustom').value.trim()){
+    batchReviewSelectedCategory='';
+    renderBatchReviewCategoryChips(null);
+  }
+});
+document.getElementById('batchReviewImages').addEventListener('change', ()=>{
+  const n = document.getElementById('batchReviewImages').files.length;
+  document.getElementById('batchReviewImagesNote').textContent = n ? n+' file(s) selected (PDF pages expand automatically)' : '';
+});
+
+async function advanceBatchReview(){
+  if(batchReviewIndex < batchReviewQueue.length-1){
+    batchReviewIndex++;
+    await showBatchReviewItem();
+  } else {
+    closeBatchReview();
+    await loadHymns(); renderLibrary(); renderHome();
+    toast(batchReviewAddedCount+' hymn(s) added');
+  }
+}
+document.getElementById('batchReviewSkip').addEventListener('click', advanceBatchReview);
+document.getElementById('batchReviewAdd').addEventListener('click', async ()=>{
+  const item = batchReviewQueue[batchReviewIndex];
+  const title = document.getElementById('batchReviewTitle').value.trim() || item.title || 'Untitled hymn';
+  const customCat = document.getElementById('batchReviewCategoryCustom').value.trim();
+  const category = customCat || batchReviewSelectedCategory || '';
+  if(customCat) await addCustomCategory(customCat);
+
+  const hymn = {
+    id: uid(), title, category, month:item.month, celebration:item.celebration, tags:[], favorite:false,
+    audioType:item.audioType, audioId:null, audioUrl:null, offlineId:null,
+    images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
+    stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  if(item.audioType==='file' && item.audioFile){
+    const mediaId = uid();
+    await dbPut('media', {id:mediaId, blob:item.audioFile});
+    hymn.audioId = mediaId;
+  } else {
+    hymn.audioUrl = item.audioUrl;
+  }
+
+  const imageFiles = Array.from(document.getElementById('batchReviewImages').files);
+  if(imageFiles.length){
+    const expanded = await expandLyricFiles(imageFiles);
+    for(const f of expanded){
+      const mediaId = uid();
+      await dbPut('media', {id:mediaId, blob:f});
+      hymn.images.push({id:mediaId, order:hymn.images.length});
+    }
+  }
+
+  await dbPut('hymns', hymn);
+  batchReviewAddedCount++;
+  if(hymn.audioType==='link' && hymn.audioUrl){
+    downloadOffline(hymn.id); // fire-and-forget, runs in the background while reviewing continues
+  }
+  await advanceBatchReview();
+});
+
+/* ============================================================
+   SAVED LOOPS (named AB ranges you can replay later)
+   ============================================================ */
+document.getElementById('saveLoopBtn').addEventListener('click', async ()=>{
+  if(ab.a==null || ab.b==null){ toast('Set A and B first'); return; }
+  const label = prompt('Name this loop', 'Loop '+((currentHymn.loops||[]).length+1));
+  if(label==null) return;
+  currentHymn.loops = currentHymn.loops||[];
+  currentHymn.loops.push({id:uid(), label, a:ab.a, b:ab.b});
+  await dbPut('hymns', currentHymn);
+  renderLoopsList();
+  toast('Loop saved');
+});
+function renderLoopsList(){
+  const el = document.getElementById('loopsList');
+  el.innerHTML='';
+  (currentHymn?.loops||[]).forEach(l=>{
+    const row=document.createElement('div');
+    row.className='loop-item';
+    row.innerHTML = `<span class="t">${escapeHtml(l.label)} (${fmtTime(l.a)}–${fmtTime(l.b)})</span>
+      <button class="mini-btn" data-a="play">▶</button>
+      <button class="mini-btn" data-a="del">✕</button>`;
+    row.querySelector('[data-a=play]').addEventListener('click', ()=>{
+      ab.a=l.a; ab.b=l.b; ab.enabled=true; updateAbLabels(); updateAbButton();
+      audio.currentTime=l.a; audio.play();
+    });
+    row.querySelector('[data-a=del]').addEventListener('click', async ()=>{
+      currentHymn.loops = currentHymn.loops.filter(x=>x.id!==l.id);
+      await dbPut('hymns', currentHymn);
+      renderLoopsList();
+    });
+    el.appendChild(row);
+  });
+}
+
+/* ============================================================
+   RECORDINGS (practice takes recorded via the microphone)
+   ============================================================ */
+let mediaRecorder=null, recordedChunks=[], recStream=null;
+document.getElementById('toggleRecordBtn').addEventListener('click', async ()=>{
+  if(mediaRecorder && mediaRecorder.state==='recording'){
+    mediaRecorder.stop();
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast('Microphone recording is not available in this browser');
+    return;
+  }
+  const proto = location.protocol;
+  if(proto==='file:' || proto==='content:'){
+    alert('Recording can\'t work when the file is opened directly like this (address bar shows "'+proto+'//..."). The microphone can only be granted to a real web address (https://) or to the app\'s own origin once it\'s built into the Capacitor app — not to a file opened straight from Downloads. Everything else in the app (playback, lyrics, practice modes, storage) still works fine here; recording specifically needs one of those two setups.');
+    return;
+  }
+  if(window.isSecureContext===false){
+    alert('Microphone access needs a secure connection (https, or the app\'s own local origin like Capacitor\'s). It will not work over plain http. This is a browser/OS restriction, not a setting in the app itself.');
+    return;
+  }
+  try{
+    recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    recordedChunks=[];
+    // Capture whatever range was active when recording started, so
+    // "Compare" can play the matching original segment afterward.
+    let captureRange = null;
+    if(ab.enabled && ab.a!=null && ab.b!=null){
+      captureRange = {start:ab.a, end:ab.b};
+    } else if(practice.active){
+      captureRange = practice.cumulative
+        ? {start:practice.cumulativeStart, end:practice.cumulativeEnd}
+        : {start:practice.segStart, end:practice.segStart+practice.segLength};
+    }
+    mediaRecorder = new MediaRecorder(recStream);
+    mediaRecorder.ondataavailable = (e)=>{ if(e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async ()=>{
+      const blob = new Blob(recordedChunks, {type:'audio/webm'});
+      const mediaId = uid();
+      await dbPut('media', {id:mediaId, blob});
+      currentHymn.recordings = currentHymn.recordings||[];
+      currentHymn.recordings.push({id:uid(), mediaId, label:new Date().toLocaleString(), createdAt:Date.now(), range:captureRange});
+      await dbPut('hymns', currentHymn);
+      renderRecordingsList();
+      recStream.getTracks().forEach(t=>t.stop());
+      document.getElementById('recDot').classList.remove('live');
+      document.getElementById('toggleRecordBtn').textContent='';
+      document.getElementById('toggleRecordBtn').innerHTML='<span class="rec-dot" id="recDot"></span>Record practice';
+      toast('Recording saved');
+    };
+    mediaRecorder.start();
+    document.getElementById('toggleRecordBtn').innerHTML='<span class="rec-dot live" id="recDot"></span>Stop recording';
+  }catch(err){
+    if(err.name==='NotAllowedError' || err.name==='PermissionDeniedError'){
+      alert('Microphone permission was denied. On Android, check: Settings → Apps → [this app] → Permissions → Microphone, and make sure it\'s allowed. If this is running inside a Capacitor-wrapped app, the native project also needs the RECORD_AUDIO permission declared and requested — that\'s a native-project setting, not something this web page can grant on its own.');
+    } else if(err.name==='NotFoundError'){
+      alert('No microphone was found on this device.');
+    } else {
+      alert('Could not start recording: '+err.message);
+    }
+  }
+});
+let activeRecordingAudio = null;
+let activeRecordingId = null;
+function stopActiveRecordingPlayback(){
+  if(activeRecordingAudio){
+    activeRecordingAudio.pause();
+    activeRecordingAudio.src='';
+  }
+  activeRecordingAudio = null;
+  activeRecordingId = null;
+}
+async function compareRecording(r){
+  stopActiveRecordingPlayback();
+  if(practice.active) stopPractice();
+  const url = await urlFor(r.mediaId);
+  if(!url) return;
+  const playRecording = ()=>{
+    stopActiveRecordingPlayback();
+    activeRecordingAudio = new Audio(url);
+    activeRecordingId = r.id;
+    activeRecordingAudio.play();
+  };
+  if(!r.range){
+    toast('No original range was captured for this recording — playing it alone');
+    playRecording();
+    return;
+  }
+  toast('Playing original, then your recording…');
+  const wasPlaying = !audio.paused;
+  const wasTime = audio.currentTime;
+  audio.currentTime = r.range.start;
+  audio.play();
+  const onCompareTick = ()=>{
+    if(audio.currentTime >= r.range.end){
+      audio.removeEventListener('timeupdate', onCompareTick);
+      audio.pause();
+      audio.currentTime = wasTime;
+      if(wasPlaying) audio.play();
+      setTimeout(playRecording, 250);
+    }
+  };
+  audio.addEventListener('timeupdate', onCompareTick);
+}
+function renderRecordingsList(){
+  const el = document.getElementById('recordingsList');
+  el.innerHTML='';
+  (currentHymn?.recordings||[]).forEach(r=>{
+    const row=document.createElement('div');
+    row.className='rec-item';
+    row.innerHTML = `<span class="t">${escapeHtml(r.label)}</span>
+      <button class="mini-btn" data-a="play">▶</button>
+      <button class="mini-btn" data-a="cmp" title="Compare with original">⇄</button>
+      <button class="mini-btn" data-a="dl">⇩</button>
+      <button class="mini-btn" data-a="del">✕</button>`;
+    row.querySelector('[data-a=play]').addEventListener('click', async ()=>{
+      const url = await urlFor(r.mediaId);
+      if(!url) return;
+      stopActiveRecordingPlayback();
+      activeRecordingAudio = new Audio(url);
+      activeRecordingId = r.id;
+      activeRecordingAudio.play();
+      activeRecordingAudio.addEventListener('ended', ()=>{
+        if(activeRecordingId===r.id) stopActiveRecordingPlayback();
+      });
+    });
+    row.querySelector('[data-a=cmp]').addEventListener('click', ()=> compareRecording(r));
+    row.querySelector('[data-a=dl]').addEventListener('click', ()=> downloadRecording(currentHymn.id, r.id));
+    row.querySelector('[data-a=del]').addEventListener('click', async ()=>{
+      if(activeRecordingId===r.id) stopActiveRecordingPlayback();
+      currentHymn.recordings = currentHymn.recordings.filter(x=>x.id!==r.id);
+      await dbPut('hymns', currentHymn);
+      await dbDelete('media', r.mediaId).catch(()=>{});
+      renderRecordingsList();
+    });
+    el.appendChild(row);
+  });
+}
+
+/* ============================================================
+   IMPORT / EXPORT (backup format specific to this app)
+   ============================================================ */
+async function exportAllData(){
+  try{
+    toast('Preparing backup…');
+    const allHymns = await dbGetAll('hymns');
+    const allMedia = await dbGetAll('media');
+    const mediaOut = [];
+    for(const m of allMedia){
+      const dataUrl = await blobToDataUrl(m.blob);
+      mediaOut.push({id:m.id, dataUrl});
+    }
+    const payload = {app:'yared-hymn-tracker', version:1, exportedAt:Date.now(), hymns:allHymns, media:mediaOut};
+    const jsonStr = JSON.stringify(payload);
+    const filename = 'yared-hymn-tracker-backup-'+new Date().toISOString().slice(0,10)+'.json';
+
+    const fsPlugin = getFilesystemPlugin();
+    const sharePlugin = getSharePlugin();
+    if(fsPlugin && sharePlugin){
+      const writeRes = await fsPlugin.writeFile({path:filename, data:jsonStr, directory:'CACHE', encoding:'utf8'});
+      await sharePlugin.share({title:'Yared Hymn Tracker backup', text:'Backup file', url:writeRes.uri, dialogTitle:'Save or share your backup'});
+    } else {
+      const blob = new Blob([jsonStr], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download=filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+    await dbPut('meta', {key:'lastBackupAt', value: Date.now()});
+    renderHome();
+    toast('Backup ready');
+  }catch(err){
+    toast('Export failed: '+(err && err.message ? err.message : 'unknown error'));
+  }
+}
+function blobToDataUrl(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+function dataUrlToBlob(dataUrl){
+  const [meta, b64] = dataUrl.split(',');
+  const mime = meta.match(/data:(.*);base64/)?.[1] || 'application/octet-stream';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr], {type:mime});
+}
+document.getElementById('importDataBtn').addEventListener('click', ()=>{
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if(payload.app!=='yared-hymn-tracker'){
+      toast('This file is not a recognized backup for this app');
+      return;
+    }
+    for(const m of (payload.media||[])){
+      const blob = dataUrlToBlob(m.dataUrl);
+      await dbPut('media', {id:m.id, blob});
+    }
+    for(const h of (payload.hymns||[])){
+      await dbPut('hymns', h);
+    }
+    await loadHymns();
+    renderLibrary(); renderHome();
+    toast('Import complete: '+(payload.hymns||[]).length+' hymn(s)');
+  }catch(err){
+    toast('Could not read this file');
+  }
+  e.target.value='';
+});
+
+/* ============================================================
+   PLAYER — CORE FIX AREA
+   Render is split into:
+     buildPlayerShell(hymn)   -> called ONCE per hymn load. Creates <img> nodes.
+     updatePlaybackUI()       -> called on every timeupdate/loop tick. NEVER touches
+                                  img.src or recreates any lyric DOM node.
+   This is what prevents the white-flash / reload bug described in the report.
+   ============================================================ */
+
+async function loadHymnIntoPlayer(hymnId, queueIds){
+  const h = await dbGet('hymns', hymnId);
+  if(!h) return;
+  // stop any active practice modes from the previous hymn
+  stopPractice(); ab.enabled=false; updateAbButton();
+  if(typeof stopActiveRecordingPlayback==='function') stopActiveRecordingPlayback();
+  ab.a=null; ab.b=null; updateAbLabels();
+  teacherAB={a:null,b:null}; contAB={a:null,b:null};
+  updateAbFieldDisplay('teacher'); updateAbFieldDisplay('continuous');
+  contBeginningPoint=null; contSegmentsSinceReview=0;
+  teacherBeginningPoint=null; teacherSegmentsSinceReview=0;
+  document.getElementById('contBeginningVal').textContent='';
+  document.getElementById('teacherBeginningVal').textContent='';
+
+  currentHymn = h;
+  currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
+  queueIndex = currentQueue.indexOf(hymnId);
+  pageIndex = 0;
+
+  await buildPlayerShell(h);
+
+  const url = await getAudioPlaybackUrl(h);
+  if(url){ audio.src = url; }
+  else { audio.removeAttribute('src'); }
+  audio.currentTime = h.lastPosition || 0;
+  audio.playbackRate = playbackSpeed;
+
+  await dbPut('meta', {key:'lastPlayed', hymnId:h.id});
+
+  setupMediaSession(h);
+  if(typeof updateMiniPlayer==='function') updateMiniPlayer();
+}
+
+async function buildPlayerShell(h){
+  document.getElementById('playerTitle').textContent = h.title;
+
+  // Lyric frame: build image nodes ONCE for this hymn load.
+  const frame = document.getElementById('lyricFrame');
+  frame.innerHTML='';
+  if(!h.images || !h.images.length){
+    frame.innerHTML = '<div class="empty-msg">No lyric images for this hymn yet. Add some by editing the hymn.</div>';
+  } else {
+    for(let i=0;i<h.images.length;i++){
+      const pageWrap = document.createElement('div');
+      pageWrap.className = 'page'+(i===0?' visible':'');
+      pageWrap.dataset.index = i;
+      const img = document.createElement('img');
+      img.draggable=false;
+      img.dataset.scale='1'; img.dataset.tx='0'; img.dataset.ty='0';
+      urlFor(h.images[i].id).then(u=>{ if(u) img.src=u; });
+      pageWrap.appendChild(img);
+      attachZoomPan(pageWrap, img);
+      frame.appendChild(pageWrap);
+    }
+  }
+  updatePageInfo();
+
+  renderLoopsList();
+  renderRecordingsList();
+  renderStatusRow();
+  renderPhraseMap();
+  if(typeof applyAdaptiveDifficulty==='function') applyAdaptiveDifficulty();
+  if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
+  if(typeof positionPinnedBlock==='function'){
+    pinnedEl.classList.remove('compact');
+    positionPinnedBlock();
+  }
+}
+
+function updatePageInfo(){
+  const total = currentHymn && currentHymn.images ? currentHymn.images.length : 0;
+  document.getElementById('pageInfo').textContent = total ? (pageIndex+1)+' / '+total : '0 / 0';
+}
+
+/* cheap UI refresh — safe to call every timeupdate tick */
+function updatePlaybackUI(){
+  if(!audio.duration || isNaN(audio.duration)) return;
+  const pct = (audio.currentTime/audio.duration)*1000;
+  const seek = document.getElementById('seekBar');
+  if(!seek._dragging) seek.value = pct;
+  document.getElementById('curTime').textContent = fmtTime(audio.currentTime);
+  document.getElementById('durTime').textContent = fmtTime(audio.duration);
+}
+
+/* page navigation — only toggles 'visible' class, never touches img.src */
+function goToPage(delta){
+  const frame = document.getElementById('lyricFrame');
+  const pages = frame.querySelectorAll('.page');
+  if(!pages.length) return;
+  pages[pageIndex]?.classList.remove('visible');
+  pageIndex = Math.max(0, Math.min(pages.length-1, pageIndex+delta));
+  pages[pageIndex]?.classList.add('visible');
+  updatePageInfo();
+}
+function resetCurrentPageZoom(){
+  const frame = document.getElementById('lyricFrame');
+  const page = frame.querySelectorAll('.page')[pageIndex];
+  if(!page) return;
+  const img = page.querySelector('img');
+  if(!img) return;
+  img.dataset.scale='1'; img.dataset.tx='0'; img.dataset.ty='0';
+  applyTransform(img);
+}
+document.getElementById('pagePrev').addEventListener('click', ()=>goToPage(-1));
+document.getElementById('pageNext').addEventListener('click', ()=>goToPage(1));
+document.getElementById('pageReset').addEventListener('click', resetCurrentPageZoom);
+
+/* ---- pinch zoom + single-finger pan, transform-only (no reflow of siblings) ---- */
+function applyTransform(img){
+  const s = parseFloat(img.dataset.scale)||1;
+  const tx = parseFloat(img.dataset.tx)||0;
+  const ty = parseFloat(img.dataset.ty)||0;
+  img.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+}
+function attachZoomPan(wrap, img){
+  let pointers = {};
+  let startDist=0, startScale=1, startMidX=0, startMidY=0, startTx=0, startTy=0, dragging=false;
+
+  wrap.addEventListener('pointerdown', (e)=>{
+    wrap.setPointerCapture(e.pointerId);
+    pointers[e.pointerId] = {x:e.clientX,y:e.clientY};
+    const ids = Object.keys(pointers);
+    if(ids.length===1){
+      dragging=true;
+      startTx=parseFloat(img.dataset.tx)||0; startTy=parseFloat(img.dataset.ty)||0;
+      startMidX=e.clientX; startMidY=e.clientY;
+    } else if(ids.length===2){
+      dragging=false;
+      const pts = Object.values(pointers);
+      startDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      startScale = parseFloat(img.dataset.scale)||1;
+    }
+  });
+  wrap.addEventListener('pointermove', (e)=>{
+    if(!pointers[e.pointerId]) return;
+    pointers[e.pointerId] = {x:e.clientX,y:e.clientY};
+    const ids = Object.keys(pointers);
+    if(ids.length===2){
+      const pts = Object.values(pointers);
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const scale = Math.max(0.5, Math.min(5, startScale * (dist/startDist)));
+      img.dataset.scale = scale;
+      applyTransform(img);
+    } else if(ids.length===1 && dragging){
+      const dx = e.clientX-startMidX, dy = e.clientY-startMidY;
+      img.dataset.tx = startTx+dx;
+      img.dataset.ty = startTy+dy;
+      applyTransform(img);
+    }
+  });
+  function release(e){ delete pointers[e.pointerId]; dragging=false; }
+  wrap.addEventListener('pointerup', release);
+  wrap.addEventListener('pointercancel', release);
+  wrap.addEventListener('pointerleave', release);
+  wrap.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    let s = parseFloat(img.dataset.scale)||1;
+    s = Math.max(0.5, Math.min(5, s + (e.deltaY<0?0.1:-0.1)));
+    img.dataset.scale = s;
+    applyTransform(img);
+  }, {passive:false});
+}
+
+/* ============================================================
+   TRANSPORT
+   ============================================================ */
+const playPauseBtn = document.getElementById('playPauseBtn');
+playPauseBtn.addEventListener('click', ()=>{
+  if(!audio.src){ toast('No audio attached to this hymn'); return; }
+  if(audio.paused) audio.play(); else audio.pause();
+});
+audio.addEventListener('play', ()=>{ playPauseBtn.textContent='❚❚'; document.getElementById('miniPlayPause').textContent='❚❚'; nativeNotifyUpdate(); });
+audio.addEventListener('pause', ()=>{ playPauseBtn.textContent='▶'; document.getElementById('miniPlayPause').textContent='▶'; nativeNotifyUpdate(); });
+audio.addEventListener('loadedmetadata', async ()=>{
+  updatePlaybackUI();
+  if(currentHymn && (!currentHymn.duration || currentHymn.duration===0)){
+    currentHymn.duration = audio.duration;
+    await dbPut('hymns', currentHymn);
+  }
+  if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
+});
+audio.addEventListener('timeupdate', ()=>{
+  updatePlaybackUI();
+  handleAbLoop();
+  handlePracticeTimeupdate();
+  persistPositionThrottled();
+  if(audio.duration && typeof setMiniSeekPct==='function'){
+    setMiniSeekPct(audio.currentTime/audio.duration);
+  }
+  if(typeof updatePhraseMapProgress==='function') updatePhraseMapProgress();
+});
+audio.addEventListener('ended', onAudioEnded);
+
+let posSaveTimer=null;
+function persistPositionThrottled(){
+  clearTimeout(posSaveTimer);
+  posSaveTimer = setTimeout(async ()=>{
+    if(!currentHymn) return;
+    currentHymn.lastPosition = audio.currentTime;
+    await dbPut('hymns', currentHymn);
+  }, 1500);
+}
+
+async function onAudioEnded(){
+  if(practice.active){
+    // fallback in case a segment's end coincided exactly with the track's end
+    // (timeupdate may not fire at the precise final frame, but 'ended' will)
+    handlePracticeTimeupdate();
+    return;
+  }
+  if(loopHymn){
+    audio.currentTime=0; audio.play();
+    return;
+  }
+  await markPracticed(currentHymn.id);
+  if(loopSet && currentQueue.length>1){
+    playNext();
+  }
+}
+
+const seekBar = document.getElementById('seekBar');
+seekBar.addEventListener('pointerdown', ()=>{ seekBar._dragging=true; });
+seekBar.addEventListener('change', ()=>{
+  if(audio.duration){ audio.currentTime = (seekBar.value/1000)*audio.duration; }
+  seekBar._dragging=false;
+});
+
+/* ============================================================
+   FINE SEEK — a separate strip below the lyrics for small,
+   precisely-controlled scrubs. Unlike the timeline (finger
+   position = absolute timestamp), here the DISTANCE dragged maps
+   to a small time offset, so a full-width swipe only nudges the
+   playhead by a few seconds — good for landing exactly on a note.
+   ============================================================ */
+const FINE_SEEK_SEC_PER_PX = 0.035;   // ~3.5s for a 100px swipe
+const FINE_SEEK_HANDLE_TRAVEL = 40;   // px the handle visually moves each direction
+(function setupFineSeek(){
+  const track = document.getElementById('fineSeekTrack');
+  const handle = document.getElementById('fineSeekHandle');
+  const deltaLabel = document.getElementById('fineSeekDelta');
+  let dragging=false, startX=0, startTime=0, wasPlaying=false;
+
+  track.addEventListener('pointerdown', (e)=>{
+    track.setPointerCapture(e.pointerId);
+    dragging=true;
+    startX = e.clientX;
+    startTime = audio.currentTime;
+    wasPlaying = !audio.paused;
+    if(wasPlaying) audio.pause();
+    handle.style.transition='none';
+  });
+  track.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    const dx = e.clientX-startX;
+    const deltaSec = dx*FINE_SEEK_SEC_PER_PX;
+    const newTime = Math.max(0, Math.min(audio.duration||0, startTime+deltaSec));
+    audio.currentTime = newTime;
+    updatePlaybackUI();
+    const handleX = Math.max(-FINE_SEEK_HANDLE_TRAVEL, Math.min(FINE_SEEK_HANDLE_TRAVEL, dx));
+    handle.style.transform = `translateX(${handleX}px)`;
+    deltaLabel.textContent = (deltaSec>=0?'+':'')+deltaSec.toFixed(1)+'s';
+  });
+  function endDrag(){
+    if(!dragging) return;
+    dragging=false;
+    handle.style.transition='';
+    handle.style.transform='translateX(0)';
+    setTimeout(()=>{ if(!dragging) deltaLabel.textContent=''; }, 600);
+    if(wasPlaying) audio.play();
+  }
+  track.addEventListener('pointerup', endDrag);
+  track.addEventListener('pointercancel', endDrag);
+  track.addEventListener('pointerleave', endDrag);
+})();
+
+/* ============================================================
+   PIN LYRICS — toggleable. When pinned, the title/lyric/fine-seek
+   block is taken out of normal flow (position:fixed) and a spacer
+   of matching height is inserted so the rest of the player scrolls
+   underneath it without jumping. Driven by JS (measuring real
+   pixel heights) rather than CSS position:sticky, which can be
+   unreliable depending on ancestor overflow/scroll setup.
+   When scrolled down, a "compact" class shrinks the pinned block
+   (hides the title, shrinks the lyric frame and fine-seek strip)
+   so it takes up less of the screen while still staying visible.
+   ============================================================ */
+let lyricsPinned = true;
+let focusMode = false;
+const playerMain = document.querySelector('main');
+const pinnedEl = document.getElementById('playerStickyTop');
+const pinnedSpacer = document.getElementById('playerStickySpacer');
+
+function positionPinnedBlock(){
+  if(focusMode){
+    // Fixed full-screen via CSS, but leave room for the bottom nav bar
+    // (which sits at a higher z-index) so it doesn't cover the transport
+    // controls anchored at the bottom of this block.
+    const navBar = document.querySelector('nav.tabbar');
+    pinnedEl.style.top='0px';
+    pinnedEl.style.bottom = (navBar ? navBar.offsetHeight : 0)+'px';
+    pinnedSpacer.style.height='0px';
+    return;
+  }
+  if(!lyricsPinned){
+    pinnedEl.style.top='';
+    pinnedEl.style.bottom='';
+    pinnedSpacer.style.height='0px';
+    return;
+  }
+  const header = document.querySelector('header.topbar');
+  pinnedEl.style.top = header.offsetHeight+'px';
+  pinnedEl.style.bottom='';
+  requestAnimationFrame(()=>{
+    pinnedSpacer.style.height = pinnedEl.offsetHeight+'px';
+  });
+}
+function setLyricsPinned(pinned){
+  lyricsPinned = pinned;
+  pinnedEl.classList.toggle('pinned', pinned);
+  if(!pinned) pinnedEl.classList.remove('compact');
+  document.getElementById('pinToggleBtn').classList.toggle('on', pinned);
+  positionPinnedBlock();
+}
+document.getElementById('pinToggleBtn').addEventListener('click', ()=> setLyricsPinned(!lyricsPinned));
+setLyricsPinned(true);
+
+/* Focus mode: hides everything below the "now playing" block and makes
+   it fill the whole screen (lyric grows, controls sit at the bottom).
+   Independent of pinning — you can use either, both, or neither. */
+function setFocusMode(on){
+  focusMode = on;
+  document.getElementById('screen-player').classList.toggle('focus-mode', on);
+  document.getElementById('focusModeBtn').classList.toggle('on', on);
+  positionPinnedBlock();
+}
+document.getElementById('focusModeBtn').addEventListener('click', ()=> setFocusMode(!focusMode));
+
+playerMain.addEventListener('scroll', ()=>{
+  if(!lyricsPinned) return;
+  const isCompact = playerMain.scrollTop > 24;
+  if(pinnedEl.classList.contains('compact') !== isCompact){
+    pinnedEl.classList.toggle('compact', isCompact);
+    positionPinnedBlock();
+  }
+});
+window.addEventListener('resize', positionPinnedBlock);
+
+function playNext(){
+  if(!currentQueue.length) return;
+  queueIndex = (queueIndex+1)%currentQueue.length;
+  loadHymnIntoPlayer(currentQueue[queueIndex], currentQueue).then(()=>audio.play());
+}
+function playPrev(){
+  if(!currentQueue.length) return;
+  queueIndex = (queueIndex-1+currentQueue.length)%currentQueue.length;
+  loadHymnIntoPlayer(currentQueue[queueIndex], currentQueue).then(()=>audio.play());
+}
+document.getElementById('nextHymnBtn').addEventListener('click', playNext);
+document.getElementById('prevHymnBtn').addEventListener('click', playPrev);
+
+/* ============================================================
+   MINI PLAYER — shown above the bottom nav whenever a hymn is
+   loaded and you're not on the Player screen itself. Mirrors
+   play/pause/next/prev and offers a simple absolute seek strip.
+   ============================================================ */
+const miniPlayer = document.getElementById('miniPlayer');
+const navBar = document.querySelector('nav.tabbar');
+function positionMiniPlayer(){
+  miniPlayer.style.bottom = navBar.offsetHeight+'px';
+}
+function setMiniSeekPct(pct){
+  pct = Math.max(0, Math.min(1, pct));
+  document.getElementById('miniSeekFill').style.width = (pct*100)+'%';
+  document.getElementById('miniSeekHandle').style.left = (pct*100)+'%';
+}
+function updateMiniPlayer(){
+  const onPlayerScreen = document.getElementById('screen-player').classList.contains('active');
+  if(!currentHymn || onPlayerScreen){
+    miniPlayer.classList.add('hidden');
+    return;
+  }
+  miniPlayer.classList.remove('hidden');
+  document.getElementById('miniTitle').textContent = currentHymn.title;
+  document.getElementById('miniThumb').textContent = currentHymn.title.charAt(0).toUpperCase();
+  document.getElementById('miniPlayPause').textContent = audio.paused ? '▶' : '❚❚';
+  setMiniSeekPct(audio.duration ? audio.currentTime/audio.duration : 0);
+  positionMiniPlayer();
+}
+document.getElementById('miniPlayPause').addEventListener('click', ()=>{
+  if(!audio.src){ toast('No audio attached to this hymn'); return; }
+  if(audio.paused) audio.play(); else audio.pause();
+});
+document.getElementById('miniNext').addEventListener('click', playNext);
+document.getElementById('miniPrev').addEventListener('click', playPrev);
+document.getElementById('miniThumb').addEventListener('click', ()=>showScreen('player'));
+document.getElementById('miniTitle').addEventListener('click', ()=>showScreen('player'));
+const miniSeek = document.getElementById('miniSeek');
+function miniSeekTo(clientX){
+  if(!audio.duration) return;
+  const rect = miniSeek.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (clientX-rect.left)/rect.width));
+  audio.currentTime = pct*audio.duration;
+  setMiniSeekPct(pct);
+}
+miniSeek.addEventListener('pointerdown', (e)=>{
+  miniSeek.setPointerCapture(e.pointerId);
+  miniSeekTo(e.clientX);
+});
+miniSeek.addEventListener('pointermove', (e)=>{
+  if(e.buttons>0) miniSeekTo(e.clientX);
+});
+window.addEventListener('resize', positionMiniPlayer);
+
+let loopHymn=false, loopSet=false;
+function updatePlaybackOptionsSummary(){
+  const el = document.getElementById('playbackOptionsSummary');
+  if(!el) return;
+  const loopBits = [];
+  if(loopHymn) loopBits.push('hymn');
+  if(loopSet) loopBits.push('set');
+  const loopText = loopBits.length ? 'Loop '+loopBits.join('+') : 'Loop off';
+  el.textContent = `${playbackSpeed}× · ${loopText}`;
+}
+document.getElementById('loopHymnBtn').addEventListener('click', function(){
+  loopHymn=!loopHymn; this.classList.toggle('on', loopHymn);
+  updatePlaybackOptionsSummary();
+});
+document.getElementById('loopSetBtn').addEventListener('click', function(){
+  loopSet=!loopSet; this.classList.toggle('on', loopSet);
+  updatePlaybackOptionsSummary();
+});
+document.getElementById('openPlaybackOptions').addEventListener('click', ()=>{
+  document.getElementById('playbackOptionsBackdrop').classList.add('active');
+});
+document.getElementById('closePlaybackOptions').addEventListener('click', ()=>{
+  document.getElementById('playbackOptionsBackdrop').classList.remove('active');
+});
+
+/* ============================================================
+   PLAYBACK SPEED
+   ============================================================ */
+let playbackSpeed = 1;
+function setPlaybackSpeed(speed){
+  playbackSpeed = speed;
+  audio.playbackRate = speed;
+  document.querySelectorAll('.speed-pill').forEach(btn=>{
+    btn.classList.toggle('on', parseFloat(btn.dataset.speed)===speed);
+  });
+  updatePlaybackOptionsSummary();
+}
+document.querySelectorAll('.speed-pill').forEach(btn=>{
+  btn.addEventListener('click', ()=> setPlaybackSpeed(parseFloat(btn.dataset.speed)));
+});
+setPlaybackSpeed(1);
+
+/* ============================================================
+   SLEEP TIMER — pauses playback after N minutes. Keeps counting
+   across hymn switches (it's about winding down your listening
+   session, not tied to any one hymn).
+   ============================================================ */
+let sleepTimerEndsAt = null;
+let sleepTimerInterval = null;
+function setSleepTimer(minutes){
+  clearInterval(sleepTimerInterval);
+  const statusEl = document.getElementById('sleepTimerStatus');
+  document.querySelectorAll('.sleep-pill').forEach(b=> b.classList.toggle('on', parseInt(b.dataset.mins)===minutes));
+  if(!minutes){
+    sleepTimerEndsAt = null;
+    statusEl.style.display='none';
+    return;
+  }
+  sleepTimerEndsAt = Date.now() + minutes*60000;
+  statusEl.style.display='block';
+  const tick = ()=>{
+    if(!sleepTimerEndsAt) return;
+    const remain = sleepTimerEndsAt - Date.now();
+    if(remain<=0){
+      audio.pause();
+      clearInterval(sleepTimerInterval);
+      sleepTimerEndsAt=null;
+      statusEl.style.display='none';
+      document.querySelectorAll('.sleep-pill').forEach(b=> b.classList.toggle('on', b.dataset.mins==='0'));
+      toast('Sleep timer — playback paused');
+      return;
+    }
+    const m = Math.floor(remain/60000), s = Math.floor((remain%60000)/1000);
+    statusEl.textContent = `Sleep timer: ${m}:${String(s).padStart(2,'0')} remaining`;
+  };
+  tick();
+  sleepTimerInterval = setInterval(tick, 1000);
+}
+document.querySelectorAll('.sleep-pill').forEach(btn=>{
+  btn.addEventListener('click', ()=> setSleepTimer(parseInt(btn.dataset.mins)));
+});
+setSleepTimer(0);
+
+document.getElementById('cueTonesBtn').addEventListener('click', function(){
+  cueTonesEnabled = !cueTonesEnabled;
+  this.classList.toggle('on', cueTonesEnabled);
+  if(cueTonesEnabled) playCueYourTurn();
+});
+
+/* ============================================================
+   AB REPEAT (simple, top-level tab)
+   ============================================================ */
+function updateAbLabels(){
+  document.getElementById('aVal').textContent = ab.a!=null ? fmtTime(ab.a) : '';
+  document.getElementById('bVal').textContent = ab.b!=null ? fmtTime(ab.b) : '';
+}
+function updateAbButton(){
+  document.getElementById('toggleAB').textContent = ab.enabled ? 'Disable AB Repeat' : 'Enable AB Repeat';
+  document.getElementById('toggleAB').classList.toggle('on', ab.enabled);
+}
+document.getElementById('setA').addEventListener('click', ()=>{ ab.a=audio.currentTime; updateAbLabels(); });
+document.getElementById('setB').addEventListener('click', ()=>{ ab.b=audio.currentTime; updateAbLabels(); });
+document.getElementById('toggleAB').addEventListener('click', ()=>{
+  if(ab.a==null || ab.b==null){ toast('Set point A and B first'); return; }
+  if(ab.b<=ab.a){ toast('Point B must be after point A'); return; }
+  ab.enabled = !ab.enabled;
+  if(ab.enabled) stopPractice();
+  updateAbButton();
+  nativeNotifyUpdate();
+});
+function handleAbLoop(){
+  if(!ab.enabled || ab.a==null || ab.b==null) return;
+  if(audio.currentTime>=ab.b){ audio.currentTime = ab.a; }
+}
+document.getElementById('abNextBtn').addEventListener('click', ()=>{
+  if(ab.a==null || ab.b==null){ toast('Set A and B first'); return; }
+  const len = ab.b-ab.a;
+  ab.a += len; ab.b += len;
+  updateAbLabels();
+  audio.currentTime = ab.a;
+  if(ab.enabled) audio.play();
+});
+document.getElementById('abPrevBtn').addEventListener('click', ()=>{
+  if(ab.a==null || ab.b==null){ toast('Set A and B first'); return; }
+  const len = ab.b-ab.a;
+  ab.a = Math.max(0, ab.a-len); ab.b = ab.a+len;
+  updateAbLabels();
+  audio.currentTime = ab.a;
+  if(ab.enabled) audio.play();
+});
+
+/* ============================================================
+   PHRASE MAP — a lightweight, persistent set of named phrases per
+   hymn (currentHymn.sections), used for the visual progress map,
+   per-phrase mastery tracking, and as a quick way to loop a phrase
+   (via the existing AB Repeat mechanism). This is a separate
+   tracking/practice layer — Teacher and Continuous Mode keep using
+   their own duration/AB-based segments for actual playback, not
+   this list, so phrase boundaries here don't need to match whatever
+   segment length you've set in those panes.
+   ============================================================ */
+function getPhraseBoundaries(){
+  return (currentHymn?.sections||[]).map(s=>s.start);
+}
+async function rebuildPhraseSections(boundaries){
+  if(!currentHymn || !audio.duration) return;
+  const oldSections = currentHymn.sections||[];
+  const bounds = boundaries.filter(b=> b>0.05 && b<audio.duration-0.05);
+  const allPoints = [0, ...bounds, audio.duration].sort((a,b)=>a-b);
+  const sections=[];
+  for(let i=0;i<allPoints.length-1;i++){
+    const start=allPoints[i], end=allPoints[i+1];
+    if(end-start<0.5) continue; // skip slivers from near-duplicate marks
+    const existing = oldSections.find(s=>Math.abs(s.start-start)<0.5);
+    sections.push({
+      id: existing?existing.id:uid(), start, end,
+      label:'Phrase '+(sections.length+1),
+      status: existing?(existing.status||'new'):'new'
+    });
+  }
+  currentHymn.sections = sections;
+  await dbPut('hymns', currentHymn);
+  renderPhraseMap();
+}
+async function addPhraseBoundary(t){
+  if(!currentHymn){ toast('Load a hymn first'); return; }
+  const existing = getPhraseBoundaries();
+  if(existing.some(b=>Math.abs(b-t)<0.5)){ toast('Already have a boundary near there'); return; }
+  await rebuildPhraseSections([...existing, t]);
+  toast('Boundary marked at '+fmtTime(t));
+}
+document.getElementById('markBoundaryBtn').addEventListener('click', ()=> addPhraseBoundary(audio.currentTime));
+document.getElementById('clearPhrasesBtn').addEventListener('click', async ()=>{
+  if(!currentHymn || !currentHymn.sections?.length) return;
+  if(!confirm('Clear all marked phrases for this hymn?')) return;
+  currentHymn.sections=[];
+  await dbPut('hymns', currentHymn);
+  renderPhraseMap();
+});
+function renderPhraseMap(){
+  const wrap = document.getElementById('phraseMap');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  const sections = (currentHymn && currentHymn.sections) || [];
+  if(!sections.length){
+    wrap.innerHTML = '<div class="empty-state" style="padding:16px;"><div class="big">🎵</div>No phrases marked yet.</div>';
+    return;
+  }
+  sections.forEach((s,i)=>{
+    const statusDef = STATUS_DEFS[s.status||'new'];
+    const block = document.createElement('div');
+    block.className='phrase-block';
+    block.dataset.start = s.start;
+    block.dataset.end = s.end;
+    block.innerHTML = `<div class="pb-num">${i+1}</div><div class="pb-time">${fmtTime(s.start)}</div><div class="pb-dot" title="${statusDef.label}" style="background:${statusDef.color}"></div><div class="pb-progress"><div class="pb-progress-fill"></div></div>`;
+    block.addEventListener('click', ()=>{
+      if(practice.active) stopPractice();
+      ab.a=s.start; ab.b=s.end; ab.enabled=true; updateAbLabels(); updateAbButton();
+      audio.currentTime=s.start; audio.play();
+      toast('Looping '+s.label);
+    });
+    block.querySelector('.pb-dot').addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const idx = STATUS_ORDER.indexOf(s.status||'new');
+      s.status = STATUS_ORDER[(idx+1)%STATUS_ORDER.length];
+      await dbPut('hymns', currentHymn);
+      renderPhraseMap();
+    });
+    wrap.appendChild(block);
+  });
+  updatePhraseMapProgress();
+}
+/* Live progress for the phrase map — the block containing the current
+   playhead is highlighted with a filling progress bar; blocks already
+   passed shade as completed. Purely time-based, so it works no matter
+   which practice mode (or plain playback) got you there. Cheap: just
+   updates classes/widths on the existing blocks, no re-render. */
+function updatePhraseMapProgress(){
+  const wrap = document.getElementById('phraseMap');
+  if(!wrap) return;
+  const blocks = wrap.querySelectorAll('.phrase-block');
+  if(!blocks.length) return;
+  const t = audio.currentTime||0;
+  blocks.forEach(block=>{
+    const start = parseFloat(block.dataset.start);
+    const end = parseFloat(block.dataset.end);
+    const fill = block.querySelector('.pb-progress-fill');
+    if(t < start){
+      block.classList.remove('current','completed');
+      if(fill) fill.style.width='0%';
+    } else if(t >= end){
+      block.classList.remove('current');
+      block.classList.add('completed');
+      if(fill) fill.style.width='100%';
+    } else {
+      block.classList.add('current');
+      block.classList.remove('completed');
+      const pct = end>start ? Math.min(100, Math.max(0, ((t-start)/(end-start))*100)) : 0;
+      if(fill) fill.style.width=pct+'%';
+    }
+  });
+}
+
+/* Auto-suggest phrase boundaries by decoding the audio and finding
+   gaps of low volume (silence) between phrases. Best-effort — some
+   hymns won't have clean enough gaps for this to find anything. */
+async function autoSuggestBoundaries(){
+  if(!currentHymn){ toast('Load a hymn first'); return; }
+  const url = await getAudioPlaybackUrl(currentHymn);
+  if(!url){ toast('No audio to analyze'); return; }
+  const progressEl = document.getElementById('autoSuggestProgress');
+  progressEl.style.display='block';
+  progressEl.textContent='Fetching audio…';
+  try{
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error('could not fetch audio');
+    const buf = await resp.arrayBuffer();
+    progressEl.textContent='Analyzing for silence gaps…';
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) throw new Error('audio analysis not supported in this browser');
+    const ctx = new Ctx();
+    const audioBuffer = await ctx.decodeAudioData(buf);
+    const data = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    const windowSize = Math.floor(sampleRate*0.05); // 50ms windows
+    const rms = [];
+    for(let i=0;i<data.length;i+=windowSize){
+      let sum=0;
+      const end=Math.min(i+windowSize, data.length);
+      for(let j=i;j<end;j++) sum += data[j]*data[j];
+      rms.push(Math.sqrt(sum/(end-i)));
+    }
+    ctx.close();
+    const maxRms = Math.max(...rms, 0.0001);
+    const threshold = maxRms*0.08;
+    const minSilenceWindows = Math.ceil(0.4/0.05); // ~0.4s of near-silence
+    const boundaries = [];
+    let silenceStart=-1;
+    for(let i=0;i<rms.length;i++){
+      if(rms[i]<threshold){
+        if(silenceStart===-1) silenceStart=i;
+      } else {
+        if(silenceStart!==-1 && (i-silenceStart)>=minSilenceWindows){
+          boundaries.push(Math.floor((silenceStart+i)/2)*windowSize/sampleRate);
+        }
+        silenceStart=-1;
+      }
+    }
+    if(!boundaries.length){
+      toast('No clear silence gaps found — try marking manually instead');
+    } else {
+      await rebuildPhraseSections([...getPhraseBoundaries(), ...boundaries]);
+      toast(boundaries.length+' phrase boundary(ies) suggested');
+    }
+  }catch(err){
+    toast('Could not analyze audio: '+(err && err.message ? err.message : 'unknown error'));
+  }
+  progressEl.style.display='none';
+}
+document.getElementById('autoSuggestBtn').addEventListener('click', autoSuggestBoundaries);
+
+
+function stepper(id, delta){
+  const input = document.getElementById(id);
+  if(!input) return;
+  const min = input.min!=='' ? parseFloat(input.min) : -Infinity;
+  input.value = Math.max(min, (parseFloat(input.value)||0)+delta);
+}
+document.querySelectorAll('.num-stepper button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    stepper(btn.dataset.target, parseInt(btn.dataset.d));
+    if(typeof updateContinuousEstimate==='function') updateContinuousEstimate();
+  });
+});
+
+/* ============================================================
+   TEACHER / CONTINUOUS shared practice engine
+   ------------------------------------------------------------
+   A "segment" is [segStart, segStart+segLength). It plays, then
+   pauses for (segLength + extraSecs) before repeating. In
+   "cumulative" mode (Start from beginning) the active range is
+   always [0, cumulativeEnd) instead, and the pause length is
+   (cumulativeEnd + extraSecs) — i.e. however long that replay
+   just took, plus the extra seconds.
+   Teacher Mode repeats the segment forever (manual Next/Previous
+   to move on). Continuous Mode repeats it `repeatCount` times,
+   pauses once more, then auto-advances to the next segment.
+   Only audio.currentTime + play/pause are touched — never the
+   lyric DOM — so no reload occurs.
+   ============================================================ */
+const paneCfg = {
+  teacher: {
+    defaultBtn:'teacherModeDefaultBtn', abBtn:'teacherModeAbBtn',
+    defaultFields:'teacherDefaultFields', abFields:'teacherAbFields',
+    duration:'teacherDuration', extra:'teacherExtraSecs',
+    setA:'teacherSetA', setB:'teacherSetB', aVal:'teacherAVal', bVal:'teacherBVal',
+    start:'startTeacher', stop:'stopTeacher',
+    prev:'teacherPrevBtn', next:'teacherNextBtn', fromStart:'teacherFromStartBtn',
+    repeats:null
+  },
+  continuous: {
+    defaultBtn:'contModeDefaultBtn', abBtn:'contModeAbBtn',
+    defaultFields:'contDefaultFields', abFields:'contAbFields',
+    duration:'contDuration', extra:'contExtraSecs',
+    setA:'contSetA', setB:'contSetB', aVal:'contAVal', bVal:'contBVal',
+    start:'startContinuous', stop:'stopContinuous',
+    prev:'contPrevBtn', next:'contNextBtn',
+    repeats:'contRepeats'
+  }
+};
+function abStoreFor(pane){ return pane==='teacher' ? teacherAB : contAB; }
+function subModeFor(pane){ return pane==='teacher' ? teacherSubMode : contSubMode; }
+function setSubModeFor(pane, mode){
+  if(pane==='teacher') teacherSubMode=mode; else contSubMode=mode;
+  const cfg = paneCfg[pane];
+  document.getElementById(cfg.defaultBtn).classList.toggle('active', mode==='default');
+  document.getElementById(cfg.abBtn).classList.toggle('active', mode==='ab');
+  document.getElementById(cfg.defaultFields).classList.toggle('hidden', mode!=='default');
+  document.getElementById(cfg.abFields).classList.toggle('hidden', mode!=='ab');
+}
+function updateAbFieldDisplay(pane){
+  const cfg = paneCfg[pane], store = abStoreFor(pane);
+  document.getElementById(cfg.aVal).textContent = store.a!=null ? fmtTime(store.a) : '';
+  document.getElementById(cfg.bVal).textContent = store.b!=null ? fmtTime(store.b) : '';
+}
+['teacher','continuous'].forEach(pane=>{
+  const cfg = paneCfg[pane];
+  document.getElementById(cfg.defaultBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'default'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.abBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'ab'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.setA).addEventListener('click', ()=>{ abStoreFor(pane).a=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.setB).addEventListener('click', ()=>{ abStoreFor(pane).b=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+});
+
+function readPaneConfig(pane){
+  const cfg = paneCfg[pane];
+  const subMode = subModeFor(pane);
+  const extraSecs = parseFloat(document.getElementById(cfg.extra).value)||0;
+  let segStart, segLength;
+  if(subMode==='ab'){
+    const store = abStoreFor(pane);
+    if(store.a==null || store.b==null || store.b<=store.a){ toast('Set A and B first'); return null; }
+    segStart = store.a; segLength = store.b-store.a;
+  } else {
+    segLength = parseFloat(document.getElementById(cfg.duration).value)||1;
+    segStart = audio.currentTime;
+  }
+  const repeatCount = cfg.repeats ? (parseInt(document.getElementById(cfg.repeats).value)||1) : Infinity;
+  return {subMode, segStart, segLength, extraSecs, repeatCount};
+}
+function seekAndPlay(t){ audio.currentTime = Math.max(0,t); audio.play(); }
+function getBounds(){
+  if(practice.cumulative) return {start:practice.cumulativeStart, end:practice.cumulativeEnd};
+  return {start:practice.segStart, end:practice.segStart+practice.segLength};
+}
+function getPauseMs(){
+  const len = practice.cumulative ? Math.max(0, practice.cumulativeEnd-practice.cumulativeStart) : practice.segLength;
+  return Math.max(0,(len+practice.extraSecs))*1000;
+}
+function startPane(pane){
+  const conf = readPaneConfig(pane);
+  if(!conf) return;
+  clearTimeout(practice.timer);
+  practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
+  practice.segStart=conf.segStart; practice.segLength=conf.segLength;
+  practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
+  practice.repDone=0; practice.cumulative=false; practice.reviewPending=false; practice.waiting=false;
+  contSegmentsSinceReview=0; teacherSegmentsSinceReview=0;
+  audio.muted=false;
+  document.getElementById('blindRecallHint').classList.add('hidden');
+  seekAndPlay(practice.segStart);
+  updatePracticeStatus();
+  nativeNotifyUpdate();
+}
+function stopPractice(){
+  practice.active=false; practice.waiting=false; practice.pane=null;
+  clearTimeout(practice.timer);
+  audio.muted=false;
+  document.getElementById('blindRecallHint').classList.add('hidden');
+  updatePracticeStatus();
+  nativeNotifyUpdate();
+}
+function startFromBeginning(pane){
+  if(!(practice.active && practice.pane===pane)){
+    const conf = readPaneConfig(pane);
+    if(!conf) return;
+    practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
+    practice.segStart=conf.segStart; practice.segLength=conf.segLength;
+    practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
+  }
+  clearTimeout(practice.timer);
+  practice.cumulative=true;
+  practice.reviewPending=false;
+  practice.cumulativeStart=0;
+  practice.cumulativeEnd = practice.segStart+practice.segLength;
+  practice.repDone=0; practice.waiting=false;
+  seekAndPlay(0);
+  updatePracticeStatus();
+  nativeNotifyUpdate();
+}
+function contReviewEnabled(){ return document.getElementById('contReviewEnabled').checked; }
+function getContReviewEveryN(){ return parseInt(document.getElementById('contReviewEveryN').value)||1; }
+
+/* Estimated total time for a full Continuous Mode run, computed by
+   simulating the exact same segment/review math the engine itself
+   uses (see advanceSegmentReal/advanceSegmentAuto below) — not a rough
+   guess. Updates live as any field changes. */
+function fmtDurationLong(totalSeconds){
+  totalSeconds = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(totalSeconds/3600);
+  const m = Math.floor((totalSeconds%3600)/60);
+  const s = totalSeconds%60;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+function calcContinuousEstimateSeconds(){
+  if(!audio.duration || !isFinite(audio.duration)) return null;
+  let segStart, segLength;
+  if(contSubMode==='ab'){
+    if(contAB.a==null || contAB.b==null || contAB.b<=contAB.a) return null;
+    segStart = contAB.a; segLength = contAB.b-contAB.a;
+  } else {
+    segLength = parseFloat(document.getElementById('contDuration').value)||0;
+    if(segLength<=0) return null;
+    segStart = audio.currentTime||0;
+  }
+  const extraSecs = parseFloat(document.getElementById('contExtraSecs').value)||0;
+  const repeatCount = parseInt(document.getElementById('contRepeats').value)||1;
+  const reviewEnabled = contReviewEnabled();
+  const reviewEveryN = getContReviewEveryN();
+  const beginningPoint = contBeginningPoint!=null ? contBeginningPoint : 0;
+  const cost = (len)=> repeatCount*(2*len+extraSecs);
+
+  let total=0, curStart=segStart, segsSinceReview=0, guard=0;
+  while(curStart+segLength <= audio.duration+0.05 && guard<20000){
+    guard++;
+    total += cost(segLength);
+    segsSinceReview++;
+    if(reviewEnabled && segsSinceReview>=reviewEveryN){
+      segsSinceReview=0;
+      const reviewLen = (curStart+segLength) - beginningPoint;
+      if(reviewLen>0) total += cost(reviewLen);
+    }
+    curStart += segLength;
+  }
+  return total;
+}
+function updateContinuousEstimate(){
+  const box = document.getElementById('contEstimateValue');
+  if(!box) return;
+  const secs = calcContinuousEstimateSeconds();
+  box.textContent = secs==null ? '—' : fmtDurationLong(secs);
+}
+
+function teacherReviewEnabled(){ return document.getElementById('teacherReviewEnabled').checked; }
+function getTeacherReviewEveryN(){ return parseInt(document.getElementById('teacherReviewEveryN').value)||1; }
+
+function nextSegment(pane){
+  if(!(practice.active && practice.pane===pane)){ toast('Press Start first'); return; }
+  clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
+
+  // Exiting a periodic review that was just heard — move to the real next segment.
+  if(practice.cumulative && practice.reviewPending){
+    practice.cumulative=false; practice.reviewPending=false;
+    practice.segStart += practice.segLength;
+    if(practice.subMode==='ab'){
+      const store = abStoreFor(pane);
+      store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+      updateAbFieldDisplay(pane);
+    }
+    seekAndPlay(practice.segStart);
+    updatePracticeStatus(); nativeNotifyUpdate();
+    return;
+  }
+
+  // Teacher's periodic review trigger (Continuous's equivalent runs automatically
+  // once a segment's repeats are exhausted — see advanceSegmentAuto).
+  if(pane==='teacher' && teacherReviewEnabled()){
+    teacherSegmentsSinceReview++;
+    if(teacherSegmentsSinceReview >= getTeacherReviewEveryN()){
+      teacherSegmentsSinceReview = 0;
+      practice.cumulative=true; practice.reviewPending=true;
+      practice.cumulativeStart = teacherBeginningPoint!=null ? teacherBeginningPoint : 0;
+      practice.cumulativeEnd = practice.segStart + practice.segLength;
+      seekAndPlay(practice.cumulativeStart);
+      updatePracticeStatus(); nativeNotifyUpdate();
+      return;
+    }
+  }
+
+  if(practice.cumulative){
+    practice.cumulativeEnd += practice.segLength;
+    seekAndPlay(practice.cumulativeStart);
+  } else {
+    practice.segStart += practice.segLength;
+    if(practice.subMode==='ab'){
+      const store = abStoreFor(pane);
+      store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+      updateAbFieldDisplay(pane);
+    }
+    seekAndPlay(practice.segStart);
+  }
+  updatePracticeStatus();
+  nativeNotifyUpdate();
+}
+function prevSegment(pane){
+  if(!(practice.active && practice.pane===pane)){ toast('Press Start first'); return; }
+  clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
+  if(practice.cumulative){
+    practice.cumulativeEnd = Math.max(practice.cumulativeStart+practice.segLength, practice.cumulativeEnd-practice.segLength);
+    seekAndPlay(practice.cumulativeStart);
+  } else {
+    practice.segStart = Math.max(0, practice.segStart-practice.segLength);
+    if(practice.subMode==='ab'){
+      const store = abStoreFor(pane);
+      store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+      updateAbFieldDisplay(pane);
+    }
+    seekAndPlay(practice.segStart);
+  }
+  updatePracticeStatus();
+  nativeNotifyUpdate();
+}
+async function finishContinuous(){
+  markPracticed(currentHymn.id);
+  currentHymn.stats = currentHymn.stats || {};
+  currentHymn.stats.continuousCompletions = (currentHymn.stats.continuousCompletions||0)+1;
+  await dbPut('hymns', currentHymn);
+  stopPractice();
+  playFinishFlourish();
+  showFinishOverlay();
+  toast('Continuous mode complete');
+}
+/* Adaptive difficulty: the more times you've fully completed a hymn in
+   Continuous Mode, the fewer repeats/shorter pauses it suggests next
+   time — you can still override before pressing Start. */
+function applyAdaptiveDifficulty(){
+  if(!currentHymn) return;
+  const completions = (currentHymn.stats && currentHymn.stats.continuousCompletions) || 0;
+  const step = Math.floor(completions/2);
+  const repeats = Math.max(1, 3-step);
+  const extra = Math.max(0.5, 2-(step*0.5));
+  document.getElementById('contRepeats').value = repeats;
+  document.getElementById('contExtraSecs').value = extra;
+}
+/* Called once a segment's repeats are exhausted in Continuous Mode. Checks
+   whether a periodic beginning-review is due; if so, plays it — repeated the
+   SAME number of times as each segment repeats (practice.repeatCount), via
+   the normal repDone/repeatCount counting in practiceAfterPause — then moves
+   to the next segment for real once the review's repeats are done. */
+function advanceSegmentAuto(){
+  if(practice.pane==='continuous' && contReviewEnabled()){
+    contSegmentsSinceReview++;
+    if(contSegmentsSinceReview >= getContReviewEveryN()){
+      contSegmentsSinceReview = 0;
+      practice.cumulative = true;
+      practice.reviewPending = true;
+      practice.cumulativeStart = contBeginningPoint!=null ? contBeginningPoint : 0;
+      practice.cumulativeEnd = practice.segStart + practice.segLength;
+      practice.repDone = 0;
+      seekAndPlay(practice.cumulativeStart);
+      updatePracticeStatus();
+      nativeNotifyUpdate();
+      return;
+    }
+  }
+  advanceSegmentReal();
+}
+function advanceSegmentReal(){
+  practice.cumulative = false;
+  practice.reviewPending = false;
+  practice.segStart += practice.segLength;
+  if(practice.pane==='continuous' && practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
+  if(practice.subMode==='ab'){
+    const store = abStoreFor(practice.pane);
+    store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
+    updateAbFieldDisplay(practice.pane);
+  }
+  audio.muted=false;
+  document.getElementById('blindRecallHint').classList.add('hidden');
+  seekAndPlay(practice.segStart);
+  nativeNotifyUpdate();
+}
+function blindRecallEnabled(){
+  const el = document.getElementById('blindRecallEnabled');
+  return !!(el && el.checked);
+}
+function practiceAfterPause(){
+  practice.waiting=false;
+  playCueYourTurn();
+  if(practice.pane==='continuous'){
+    practice.repDone++;
+    if(practice.repDone < practice.repeatCount){
+      // Blind recall: on a repeat after the first (already-covered) pass,
+      // sometimes mute so you have to recall/sing it yourself — the next
+      // repeat always plays normally so you can check yourself.
+      const doBlind = blindRecallEnabled() && !practice.cumulative && practice.repDone>=1 && Math.random()<0.4;
+      audio.muted = doBlind;
+      document.getElementById('blindRecallHint').classList.toggle('hidden', !doBlind);
+      seekAndPlay(practice.cumulative ? practice.cumulativeStart : practice.segStart);
+    } else {
+      audio.muted=false;
+      document.getElementById('blindRecallHint').classList.add('hidden');
+      practice.repDone=0;
+      if(practice.reviewPending){
+        advanceSegmentReal();
+      } else {
+        advanceSegmentAuto();
+      }
+    }
+  } else {
+    seekAndPlay(practice.cumulative?practice.cumulativeStart:practice.segStart);
+  }
+  updatePracticeStatus();
+}
+function handlePracticeTimeupdate(){
+  if(!practice.active || practice.waiting) return;
+  const b = getBounds();
+  if(audio.currentTime>=b.end){
+    audio.pause();
+    practice.waiting=true;
+    playCueListenAgain();
+    updatePracticeStatus();
+    practice.timer = setTimeout(practiceAfterPause, getPauseMs());
+  }
+}
+function updatePracticeStatus(){
+  const el = document.getElementById('practiceStatus');
+  const quickActions = document.getElementById('teacherQuickActions');
+  quickActions.classList.toggle('hidden', !(practice.active && practice.pane==='teacher' && practice.waiting));
+  if(!practice.active){ el.classList.remove('active'); el.textContent=''; return; }
+  el.classList.add('active');
+  const label = practice.pane==='teacher' ? 'Teacher mode' : 'Continuous mode';
+  const range = practice.cumulative
+    ? `${fmtTime(practice.cumulativeStart)}–${fmtTime(practice.cumulativeEnd)} (review)`
+    : `${fmtTime(practice.segStart)}–${fmtTime(practice.segStart+practice.segLength)}`;
+  const repInfo = (practice.pane==='continuous' && !practice.cumulative && isFinite(practice.repeatCount))
+    ? ` · repeat ${Math.min(practice.repDone+1, practice.repeatCount)}/${practice.repeatCount}` : '';
+  el.textContent = `${label} — ${range}${repInfo}${practice.waiting?' (paused)':''}`;
+}
+document.getElementById('startTeacher').addEventListener('click', ()=>startPane('teacher'));
+document.getElementById('stopTeacher').addEventListener('click', stopPractice);
+document.getElementById('teacherNextBtn').addEventListener('click', ()=>nextSegment('teacher'));
+document.getElementById('teacherPrevBtn').addEventListener('click', ()=>prevSegment('teacher'));
+document.getElementById('teacherFromStartBtn').addEventListener('click', ()=>startFromBeginning('teacher'));
+document.getElementById('teacherAgainBtn').addEventListener('click', ()=>{
+  if(!(practice.active && practice.pane==='teacher' && practice.waiting)) return;
+  clearTimeout(practice.timer);
+  practiceAfterPause(); // skip the rest of the wait, replay immediately
+});
+document.getElementById('teacherGotItBtn').addEventListener('click', ()=>{
+  if(!(practice.active && practice.pane==='teacher')) return;
+  clearTimeout(practice.timer);
+  nextSegment('teacher');
+});
+document.getElementById('teacherSetBeginningBtn').addEventListener('click', ()=>{
+  teacherBeginningPoint = audio.currentTime;
+  document.getElementById('teacherBeginningVal').textContent = fmtTime(teacherBeginningPoint);
+});
+
+document.getElementById('startContinuous').addEventListener('click', ()=>startPane('continuous'));
+document.getElementById('stopContinuous').addEventListener('click', stopPractice);
+document.getElementById('contNextBtn').addEventListener('click', ()=>nextSegment('continuous'));
+document.getElementById('contPrevBtn').addEventListener('click', ()=>prevSegment('continuous'));
+document.getElementById('contSetBeginningBtn').addEventListener('click', ()=>{
+  contBeginningPoint = audio.currentTime;
+  document.getElementById('contBeginningVal').textContent = fmtTime(contBeginningPoint);
+  updateContinuousEstimate();
+});
+document.getElementById('contReviewEnabled').addEventListener('change', updateContinuousEstimate);
+['contDuration','contExtraSecs','contRepeats','contReviewEveryN'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateContinuousEstimate);
+});
+
+/* ============================================================
+   SUBTABS (AB / Teacher / Continuous panels)
+   ============================================================ */
+document.querySelectorAll('.subtabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.subpane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.pane).classList.add('active');
+    if(btn.dataset.pane==='pane-continuous' && typeof updateContinuousEstimate==='function') updateContinuousEstimate();
+  });
+});
+
+/* ============================================================
+   MEDIA SESSION (lock-screen / notification-style controls)
+   ============================================================ */
+function setupMediaSession(h){
+  if(!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: h.title, artist:'Yared Hymn Tracker', album: h.category||''
+  });
+  navigator.mediaSession.setActionHandler('play', ()=>audio.play());
+  navigator.mediaSession.setActionHandler('pause', ()=>audio.pause());
+  navigator.mediaSession.setActionHandler('previoustrack', playPrev);
+  navigator.mediaSession.setActionHandler('nexttrack', playNext);
+  nativeNotifyUpdate();
+}
+
+/* ============================================================
+   NATIVE BACKGROUND-PLAYBACK NOTIFICATION
+   ------------------------------------------------------------
+   Bridges to a small custom native Android plugin (added to the
+   Capacitor project by the GitHub Actions build, not present in
+   this HTML file itself) that runs a real foreground Service with
+   a persistent notification, so playback keeps going with the
+   screen off. Everything here is guarded so the app still works
+   normally — just without the persistent notification — when
+   opened in a plain browser where that native plugin doesn't exist.
+   ============================================================ */
+function getNativeNotifPlugin(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PlaybackNotification){
+      return window.Capacitor.Plugins.PlaybackNotification;
+    }
+  }catch(e){}
+  return null;
+}
+function nativeNotifyUpdate(){
+  const plugin = getNativeNotifPlugin();
+  if(!plugin || !currentHymn) return;
+  plugin.update({
+    title: currentHymn.title,
+    playing: !audio.paused,
+    modeActive: isPracticeModeActive(),
+    statusText: getNotificationStatusText()
+  }).catch(()=>{});
+}
+/* Short status line for the notification body: playing/paused state plus
+   whatever segment is currently active (AB range, or the current Teacher/
+   Continuous segment), instead of a generic "practice mode active" label. */
+function getNotificationStatusText(){
+  const state = audio.paused ? 'Paused' : 'Playing';
+  if(ab.enabled && ab.a!=null && ab.b!=null){
+    return `${state} — AB ${fmtTime(ab.a)}–${fmtTime(ab.b)}`;
+  }
+  if(practice.active){
+    const label = practice.pane==='teacher' ? 'Teacher' : 'Continuous';
+    const range = practice.cumulative
+      ? `${fmtTime(practice.cumulativeStart)}–${fmtTime(practice.cumulativeEnd)} review`
+      : `${fmtTime(practice.segStart)}–${fmtTime(practice.segStart+practice.segLength)}`;
+    return `${state} — ${label} ${range}`;
+  }
+  return state;
+}
+/* Whether a practice mode (AB Repeat / Teacher / Continuous) is currently
+   controlling playback — used to decide whether the notification shows a
+   second "segment" Next/Previous pair alongside the normal hymn skip pair. */
+function isPracticeModeActive(){
+  return !!(ab.enabled || (practice && practice.active));
+}
+/* "Segment" next/previous — steps through whatever mode is currently
+   active, mirroring that mode's own in-app Next/Previous button. */
+function modeNext(){
+  if(ab.enabled){ document.getElementById('abNextBtn').click(); return; }
+  if(practice.active) nextSegment(practice.pane);
+}
+function modePrev(){
+  if(ab.enabled){ document.getElementById('abPrevBtn').click(); return; }
+  if(practice.active) prevSegment(practice.pane);
+}
+function setupNativeNotificationBridge(){
+  const plugin = getNativeNotifPlugin();
+  if(!plugin) return;
+  plugin.addListener('play', ()=>audio.play());
+  plugin.addListener('pause', ()=>audio.pause());
+  plugin.addListener('next', playNext);
+  plugin.addListener('previous', playPrev);
+  plugin.addListener('modenext', modeNext);
+  plugin.addListener('modeprev', modePrev);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+function applyDarkMode(dark){
+  document.body.classList.toggle('dark', dark);
+  document.getElementById('darkModeToggle').textContent = dark ? '☀️' : '🌙';
+}
+document.getElementById('darkModeToggle').addEventListener('click', async ()=>{
+  const dark = !document.body.classList.contains('dark');
+  applyDarkMode(dark);
+  await dbPut('meta', {key:'darkMode', value:dark});
+});
+async function loadDarkModePref(){
+  const rec = await dbGet('meta','darkMode');
+  applyDarkMode(!!(rec && rec.value));
+}
+
+async function init(){
+  await openDB();
+  await loadDarkModePref();
+  await loadHymns();
+  renderHome();
+  renderLibrary();
+  setupNativeNotificationBridge();
+  hideNativeSplashScreen();
+  await loadReminderSettings();
+  await checkIncomingAudio();
+}
+/* Safety net: launchAutoHide (set in capacitor.config.json) already hides the
+   splash automatically once the WebView is ready, with launchShowDuration:0
+   meaning no artificial delay — this just guarantees it's gone the moment
+   our own app has finished its first render, in case autoHide timing ever
+   lags on a particular device. No-ops harmlessly outside the native app. */
+function hideNativeSplashScreen(){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen){
+      window.Capacitor.Plugins.SplashScreen.hide();
+    }
+  }catch(e){}
+}
+
+/* ============================================================
+   INCOMING AUDIO — picks up a file the app was opened "with" from a
+   file manager, or shared to it from another app, and feeds it
+   straight into the Add wizard. Checked on cold start and again
+   whenever the app comes back to the foreground, since Android can
+   deliver a fresh "open with" intent while the app is already running.
+   ============================================================ */
+async function checkIncomingAudio(){
+  try{
+    if(!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.IncomingAudio)) return;
+    const res = await window.Capacitor.Plugins.IncomingAudio.getPendingAudio();
+    if(!res || !res.path) return;
+    toast('Loading shared audio…');
+    const fileUrl = window.Capacitor.convertFileSrc(res.path);
+    const resp = await fetch(fileUrl);
+    if(!resp.ok) throw new Error('could not read the shared file');
+    const blob = await resp.blob();
+    const file = new File([blob], res.filename||'Untitled.mp3', {type: res.mimeType||blob.type||'audio/mpeg'});
+    openAddWizardWithFile(file);
+  }catch(e){
+    toast('Could not load the shared audio file');
+  }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible') checkIncomingAudio();
+});
+
+init();
+
+})();
+</script>
+</body>
+</html>
