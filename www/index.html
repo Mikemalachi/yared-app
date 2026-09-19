@@ -634,6 +634,15 @@
         </div>
       </div>
 
+      <div class="card hidden" id="webSaveCard">
+        <div style="font-size:13.5px; font-weight:600; margin-bottom:4px;">💾 Where downloads are saved</div>
+        <div id="webSaveInfo" style="font-size:12.5px; color:var(--ink-soft); margin-bottom:8px;"></div>
+        <div class="row" style="gap:6px;">
+          <button class="btn secondary hidden" id="webSaveChooseBtn" style="flex:1;">Choose folder</button>
+          <button class="btn ghost hidden" id="webSaveForgetBtn">Forget</button>
+        </div>
+      </div>
+
       <div class="section-title">Reminders</div>
       <div class="card">
         <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
@@ -2135,7 +2144,118 @@ async function ensureFileAccess(){
 /* Saves a blob via the native plugin into Music/Yared music/<month>/<celebration>[/<extraSub>]/<title>.<ext>,
    falling back to a plain browser download (best-effort path hint only)
    when the native plugin isn't available. */
-async function saveAudioToDevice(blob, {month, celebration, title, extraSub, path}){
+/* ============================================================
+   SAVING FILES IN THE WEB APP (iPad / PC)
+   A web page can't pick a folder by itself. Chrome/Edge on a computer
+   let the learner choose one folder once (File System Access API); the
+   app then creates Yared music/<house>/<folders>/ inside it and
+   remembers the choice. Safari (iPad) has no folder access, so there
+   the share sheet opens instead ("Save to Files" → pick the folder).
+   Anything else falls back to a normal download.
+   ============================================================ */
+function isNativeApp(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+function canPickSaveFolder(){ return !isNativeApp() && typeof window.showDirectoryPicker === 'function'; }
+async function getSavedRootHandle(){
+  try{ const r = await dbGet('meta','webSaveRoot'); return (r && r.value) || null; }catch(e){ return null; }
+}
+/* Must run straight from the tap (before any long fetch), because the
+   browser only allows the folder prompt / permission prompt right after a tap. */
+async function prepareWebSaveRoot(){
+  if(!canPickSaveFolder()) return null;
+  let h = await getSavedRootHandle();
+  try{
+    if(h){
+      let perm = await h.queryPermission({mode:'readwrite'});
+      if(perm !== 'granted') perm = await h.requestPermission({mode:'readwrite'});
+      if(perm === 'granted') return h;
+    }
+    toast('Choose the folder to save hymns in (e.g. your Music folder)');
+    h = await window.showDirectoryPicker({id:'yared-music', mode:'readwrite', startIn:'music'});
+    await dbPut('meta', {key:'webSaveRoot', value:h});
+    renderWebSaveInfo();
+    return h;
+  }catch(e){
+    return null; // cancelled or not allowed — fall back to a normal download
+  }
+}
+/* Latin spelling of Ge'ez text — only used if a browser can't make a folder
+   with the Amharic name (checked below), so files never land in the wrong place. */
+const GEEZ_ROWS = ['h','l','h','m','s','r','s','sh','q','qw','q','qw','b','v','t','ch','h','hw','n','gn','','k','kw','kh','khw','w','','z','zh','y','d','dd','j','g','gw','gg','t','ch','p','ts','ts','f','p'];
+const GEEZ_VOWELS = ['e','u','i','a','ie','','o','wa'];
+function translitGeez(str){
+  let out = '';
+  for(const ch of String(str||'')){
+    const cp = ch.codePointAt(0);
+    if(cp >= 0x1200 && cp < 0x1200 + GEEZ_ROWS.length*8){
+      const c = GEEZ_ROWS[(cp - 0x1200) >> 3], o = cp & 7;
+      out += c === '' ? ['a','u','i','a','ie','e','o','wa'][o] : c + GEEZ_VOWELS[o];
+    } else if(ch === '፡' || ch === '፣' || ch === '፤'){ out += ' '; }
+    else if(ch === '።'){ out += '.'; }
+    else if(cp >= 0x1369 && cp <= 0x137C){ /* Ge'ez numerals: skip */ }
+    else out += ch;
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+async function childDir(parent, name){
+  const d = await parent.getDirectoryHandle(name, {create:true});
+  if(d.isSameEntry && await d.isSameEntry(parent)){
+    const alt = translitGeez(name) || 'folder';
+    return {dir: await parent.getDirectoryHandle(alt, {create:true}), name: alt};
+  }
+  return {dir: d, name};
+}
+async function writeIntoFolder(root, subPath, filename, blob){
+  let dir = root;
+  const used = [];
+  if(root.name !== 'Yared music'){ dir = await dir.getDirectoryHandle('Yared music', {create:true}); }
+  for(const part of subPath.split('/').filter(Boolean)){
+    const r = await childDir(dir, part);
+    dir = r.dir; used.push(r.name);
+  }
+  let fh, fname = filename;
+  try{ fh = await dir.getFileHandle(fname, {create:true}); }
+  catch(e){ fname = translitGeez(filename) || ('hymn-' + Date.now() + '.mp3'); fh = await dir.getFileHandle(fname, {create:true}); }
+  const w = await fh.createWritable();
+  await w.write(blob);
+  await w.close();
+  return (root.name === 'Yared music' ? '' : root.name + '/') + 'Yared music/' + (used.length ? used.join('/') + '/' : '') + fname;
+}
+async function renderWebSaveInfo(){
+  const card = document.getElementById('webSaveCard');
+  if(!card) return;
+  if(isNativeApp()){ card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const el = document.getElementById('webSaveInfo');
+  if(!canPickSaveFolder()){
+    el.textContent = navigator.canShare
+      ? 'On this device downloads open the share sheet — tap “Save to Files” and pick the folder shown in the message.'
+      : 'This browser can only save to its Downloads folder. Chrome or Edge on a computer can save into your own folders.';
+    document.getElementById('webSaveChooseBtn').classList.add('hidden');
+    document.getElementById('webSaveForgetBtn').classList.add('hidden');
+    return;
+  }
+  const h = await getSavedRootHandle();
+  el.innerHTML = h
+    ? `Saving into <b>${escapeHtml(h.name === 'Yared music' ? 'Yared music' : h.name + ' / Yared music')}</b>, sorted into house and folder sub-folders.`
+    : 'Not chosen yet — you’ll be asked for a folder on your first download.';
+  document.getElementById('webSaveChooseBtn').classList.remove('hidden');
+  document.getElementById('webSaveChooseBtn').textContent = h ? 'Change folder' : 'Choose folder';
+  document.getElementById('webSaveForgetBtn').classList.toggle('hidden', !h);
+}
+document.getElementById('webSaveChooseBtn').addEventListener('click', async ()=>{
+  try{
+    const h = await window.showDirectoryPicker({id:'yared-music', mode:'readwrite', startIn:'music'});
+    await dbPut('meta', {key:'webSaveRoot', value:h});
+    toast('Downloads will go into ' + h.name);
+  }catch(e){}
+  renderWebSaveInfo();
+});
+document.getElementById('webSaveForgetBtn').addEventListener('click', async ()=>{
+  await dbDelete('meta','webSaveRoot').catch(()=>{});
+  renderWebSaveInfo();
+});
+
+async function saveAudioToDevice(blob, {month, celebration, title, extraSub, path, webRoot}){
   const ext = EXT_BY_MIME[baseMime(blob.type)] || 'mp3';
   const filename = `${sanitizeFilenamePart(title)}.${ext}`;
   // hymns filed in a folder are saved in the same folders: Music/Yared music/ዜማ ቤት/ድጓ/…
@@ -2173,7 +2293,28 @@ async function saveAudioToDevice(blob, {month, celebration, title, extraSub, pat
     return;
   }
 
-  // Browser fallback — no real folder guarantee, see caveat in prior notes.
+  // Web app on a computer (Chrome/Edge): write straight into the chosen folder tree
+  if(webRoot){
+    try{
+      const where = await writeIntoFolder(webRoot, subPath, filename, blob);
+      toast('Saved to ' + where);
+      return;
+    }catch(err){ /* permission lost or disk error — fall through to share / download */ }
+  }
+  // iPad / phones' browsers: share sheet → "Save to Files"
+  if(!isNativeApp() && !canPickSaveFolder() && navigator.canShare){
+    try{
+      const file = new File([blob], filename, {type: baseMime(blob.type) || 'audio/mpeg'});
+      if(navigator.canShare({files:[file]})){
+        toast('Tap “Save to Files”, then open: Yared music/' + subPath);
+        await navigator.share({files:[file], title: title});
+        return;
+      }
+    }catch(err){
+      if(err && err.name === 'AbortError') return; // closed the share sheet
+    }
+  }
+  // Last resort: a normal download (goes to the browser's Downloads folder)
   const dlName = `${subPath}/${filename}`;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2183,6 +2324,7 @@ async function saveAudioToDevice(blob, {month, celebration, title, extraSub, pat
   toast('Downloading…');
 }
 async function downloadHymnAudio(hymnId){
+  const webRoot = await prepareWebSaveRoot();
   const h = await dbGet('hymns', hymnId);
   if(!h) return;
   let blob=null;
@@ -2199,9 +2341,10 @@ async function downloadHymnAudio(hymnId){
     return;
   }
   if(!blob){ toast('No audio attached to this hymn'); return; }
-  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title, path:h.path});
+  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title, path:h.path, webRoot});
 }
 async function downloadRecording(hymnId, recordingId){
+  const webRoot = await prepareWebSaveRoot();
   const h = await dbGet('hymns', hymnId);
   if(!h) return;
   const rec = (h.recordings||[]).find(r=>r.id===recordingId);
@@ -2214,7 +2357,7 @@ async function downloadRecording(hymnId, recordingId){
     try{ out = await blobToWav(out); }catch(e){ /* keep the original if this browser can't decode it */ }
   }
   await saveAudioToDevice(out, {
-    month:h.month, celebration:h.celebration, extraSub:'Recording', path:h.path,
+    month:h.month, celebration:h.celebration, extraSub:'Recording', path:h.path, webRoot,
     title: `${h.title} - ${rec.label}`
   });
 }
@@ -6451,6 +6594,7 @@ async function init(){
   await loadAppearance();
   await loadHymns();
   await loadFolders();
+  renderWebSaveInfo();
   renderHome();
   renderLibrary();
   setupNativeNotificationBridge();
