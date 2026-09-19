@@ -2165,6 +2165,8 @@ document.getElementById('shareHymnBtn').addEventListener('click', ()=>{
    which fetches it on Google's side (web app on iPad / PC).
    ============================================================ */
 function directAudioUrl(url){
+  // tidy links pasted with real spaces or odd characters: "a b.mp3" -> "a%20b.mp3" (already-encoded %20 stays as is)
+  try{ url = encodeURI(decodeURI(String(url||'').trim())); }catch(e){ url = String(url||'').trim().replace(/ /g,'%20'); }
   const m = String(url||'').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([a-zA-Z0-9_-]{20,})/);
   return m ? 'https://drive.google.com/uc?export=download&id=' + m[1] : url;
 }

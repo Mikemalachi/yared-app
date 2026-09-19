@@ -308,6 +308,7 @@ function image_(id, url){
 // allowed to read (most sites don't send CORS headers). Drive links you own are read directly.
 function audio_(url){
   if(!url || !/^https?:\/\//i.test(url)) return {ok:false, error:'No audio link'};
+  url = String(url).trim().replace(/ /g, '%20');
   let blob = null;
   const id = driveId_(url);
   if(id){
