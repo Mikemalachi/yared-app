@@ -4890,8 +4890,11 @@ document.getElementById('sheetSyncUrl').addEventListener('input', (e)=>{
 function openExternalUrl(url){
   const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   if(isNative){ window.location.href = url; return; }
-  const w = window.open(url, '_blank', 'noopener');
-  if(!w) window.location.href = url;
+  // a real link click opens a new tab without ever touching this page
+  // (window.open with "noopener" reports failure even when it works)
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 function isSafeSheetUrl(u){ return /^https:\/\/docs\.google\.com\/spreadsheets\//.test(String(u||'')); }
 document.getElementById('sheetOpenBtn').addEventListener('click', async ()=>{
