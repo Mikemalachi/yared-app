@@ -91,3 +91,23 @@ Replace `www/index.html` with a newer version and commit — the
 workflow re-runs automatically and produces a fresh APK. The native
 files in `native-templates/` only need to change if you want to modify
 the background-playback behavior itself.
+
+## Google Sheets sync
+The app can sync two ways with a Google Sheet (titles, category, month, celebration, audio
+links, status, length, practice count, lyric images via Drive). The server side is a small
+Apps Script in `google-sheets-sync/Code.gs` — follow `google-sheets-sync/SETUP.md` once, then
+paste the web app URL and secret key into the app's Home → Google Sheets sync card.
+
+## Web version (iPad / PC)
+The same app is published as a web app from the `www/` folder by
+`.github/workflows/deploy-web.yml`, at https://mikemalachi.github.io/yared-app/
+
+One-time: on GitHub open the repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+After that every push that changes `www/` redeploys it.
+(GitHub Pages is free for public repos; a private repo needs a paid GitHub plan for Pages.)
+
+* **iPad:** open the link in Safari → Share → **Add to Home Screen**. It opens full-screen and works offline.
+* **PC:** open it in Chrome or Edge → the install icon in the address bar (or just bookmark it).
+* Each device keeps its own library; connect each one to the same Google Sheet (scan the QR) to share hymns,
+  status and lyric images between them.
+* Phone-only features (lock-screen controls, reminders, home-screen widget, "open with") need the Android app.
