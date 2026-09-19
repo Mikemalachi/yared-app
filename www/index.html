@@ -2156,23 +2156,76 @@ document.getElementById('shareHymnBtn').addEventListener('click', ()=>{
   if(editingHymnId) shareHymn(editingHymnId);
 });
 
+/* ============================================================
+   FETCHING AUDIO LINKS — the page can play almost any link with
+   <audio>, but reading the bytes (for downloading offline or for
+   phrase analysis) is blocked by most sites (no CORS headers).
+   Try, in order: a direct fetch → the Android app's native
+   downloader (not subject to CORS) → the Google Sheets script,
+   which fetches it on Google's side (web app on iPad / PC).
+   ============================================================ */
+function directAudioUrl(url){
+  const m = String(url||'').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([a-zA-Z0-9_-]{20,})/);
+  return m ? 'https://drive.google.com/uc?export=download&id=' + m[1] : url;
+}
+function looksLikeWebPage(blob){ return /text\/html/i.test(blob.type || ''); }
+async function fetchAudioBlob(url, onStatus){
+  const src = directAudioUrl(url);
+  const say = t=>{ if(onStatus) onStatus(t); };
+  let firstErr = null;
+  // 1. plain fetch (works for sites that allow it, and for blob: URLs)
+  try{
+    const r = await fetch(src);
+    if(!r.ok) throw new Error('the site answered HTTP ' + r.status);
+    const b = await r.blob();
+    if(looksLikeWebPage(b)) throw new Error('that link opens a web page, not an audio file');
+    return b;
+  }catch(e){ firstErr = e; if(/^blob:/.test(src)) throw e; }
+  // 2. Android app: native download to a cache file, read back without the bridge
+  const P = window.Capacitor && window.Capacitor.Plugins;
+  if(P && P.UrlDownloader){
+    say('Downloading through the app…');
+    const res = await P.UrlDownloader.download({url: src});
+    try{
+      const r = await fetch(window.Capacitor.convertFileSrc(res.path));
+      const raw = await r.blob();
+      const b = new Blob([raw], {type: (res.mimeType||'').split(';')[0] || raw.type || 'audio/mpeg'});
+      if(looksLikeWebPage(b)) throw new Error('that link opens a web page, not an audio file');
+      return b;
+    } finally {
+      P.UrlDownloader.remove({path: res.path}).catch(()=>{});
+    }
+  }
+  // 3. web app: let the Google Sheets script fetch it
+  if(typeof sheetSyncConfigured === 'function' && sheetSyncConfigured()){
+    say('Fetching through your Google Sheet…');
+    const res = await sheetApiGet({action:'audio', url: src});
+    return dataUrlToBlob('data:' + (res.mime || 'audio/mpeg') + ';base64,' + res.data);
+  }
+  throw new Error('this site blocks direct downloads. In the web app, connect Google Sheets sync (Home) so it can fetch the file for you — or use the Android app' + (firstErr && firstErr.message && !/Failed to fetch|NetworkError|Load failed/i.test(firstErr.message) ? ' (' + firstErr.message + ')' : ''));
+}
+async function saveOfflineCopy(h, blob){
+  const mediaId = uid();
+  await dbPut('media', {id:mediaId, blob});
+  const fresh = await dbGet('hymns', h.id);
+  if(!fresh) return;
+  fresh.offlineId = mediaId;
+  await dbPut('hymns', fresh);
+  if(currentHymn && currentHymn.id === h.id) currentHymn.offlineId = mediaId;
+  const i = hymns.findIndex(x=>x.id===h.id); if(i>-1) hymns[i] = fresh;
+}
+
 async function downloadOffline(hymnId){
   const h = await dbGet('hymns', hymnId);
   if(!h || !h.audioUrl) return;
   toast('Downloading...');
   try{
-    const resp = await fetch(h.audioUrl);
-    if(!resp.ok) throw new Error('bad response');
-    const blob = await resp.blob();
-    const mediaId = uid();
-    await dbPut('media', {id:mediaId, blob});
-    h.offlineId = mediaId;
-    await dbPut('hymns', h);
+    const blob = await fetchAudioBlob(h.audioUrl, t=>toast(t));
+    await saveOfflineCopy(h, blob);
     toast('Downloaded for offline use');
-    if(currentHymn && currentHymn.id===hymnId) currentHymn = h;
     if(editingHymnId===hymnId) openEditModal(hymnId);
   }catch(err){
-    toast('Could not download this link (site may block direct downloads)');
+    toast('Could not download: ' + (err && err.message ? err.message : 'unknown error'));
   }
 }
 function closeModal(){ document.getElementById('hymnModalBackdrop').classList.remove('active'); editingHymnId=null; }
@@ -3937,9 +3990,12 @@ async function autoSuggestBoundaries(){
   progressEl.style.display='block';
   progressEl.textContent='Fetching audio…';
   try{
-    const resp = await fetch(url);
-    if(!resp.ok) throw new Error('could not fetch audio');
-    const buf = await resp.arrayBuffer();
+    const blob = await fetchAudioBlob(url, t=>{ progressEl.textContent = t; });
+    // a link that had to be fetched the long way is kept as an offline copy, so next time is instant
+    if(!/^blob:/.test(url) && currentHymn.audioType==='link' && !currentHymn.offlineId){
+      saveOfflineCopy(currentHymn, blob).catch(()=>{});
+    }
+    const buf = await blob.arrayBuffer();
     progressEl.textContent='Analyzing for silence gaps…';
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if(!Ctx) throw new Error('audio analysis not supported in this browser');

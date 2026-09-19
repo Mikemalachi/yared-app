@@ -23,6 +23,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AudioFileSaverPlugin.class);
         registerPlugin(ReminderPlugin.class);
         registerPlugin(IncomingAudioPlugin.class);
+        registerPlugin(UrlDownloaderPlugin.class);
         super.onCreate(savedInstanceState);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {

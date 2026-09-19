@@ -26,6 +26,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
+          # the old default also asks for the retired 'tools' package, which newer SDK managers reject
           packages: 'platform-tools'
 
       - name: Install npm dependencies
@@ -70,6 +71,7 @@ jobs:
           cp native-templates/BootReceiver.java android/app/src/main/java/com/yared/hymntracker/BootReceiver.java
           cp native-templates/DueHymnsWidgetProvider.java android/app/src/main/java/com/yared/hymntracker/DueHymnsWidgetProvider.java
           cp native-templates/IncomingAudioPlugin.java android/app/src/main/java/com/yared/hymntracker/IncomingAudioPlugin.java
+          cp native-templates/UrlDownloaderPlugin.java android/app/src/main/java/com/yared/hymntracker/UrlDownloaderPlugin.java
           cp native-templates/res/layout/widget_due_hymns.xml android/app/src/main/res/layout/widget_due_hymns.xml
           cp native-templates/res/xml/due_hymns_widget_info.xml android/app/src/main/res/xml/due_hymns_widget_info.xml
 

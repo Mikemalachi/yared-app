@@ -32,6 +32,15 @@ function onOpen(){
 
 function setup(){
   const sheet = getSheet_();
+  // make "Hymns" the first tab and drop the empty default "Sheet1", so it's the tab you see
+  const ss = SpreadsheetApp.getActive();
+  ss.setActiveSheet(sheet);
+  ss.moveActiveSheet(1);
+  ss.getSheets().forEach(sh => {
+    if(sh.getSheetId() !== sheet.getSheetId() && /^(Sheet|Feuille|Hoja|Tabelle)\s?1$/i.test(sh.getName()) && sh.getLastRow() === 0 && sh.getLastColumn() === 0){
+      try{ ss.deleteSheet(sh); }catch(e){}
+    }
+  });
   const map = headerMap_(sheet);
   sheet.setFrozenRows(1);
   const hdr = sheet.getRange(1, 1, 1, sheet.getLastColumn());
@@ -44,7 +53,6 @@ function setup(){
       SpreadsheetApp.newDataValidation().requireValueInList(
         ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miazia','Ginbot','Sene','Hamle','Nehase','Pagume'], true)
         .setAllowInvalid(true).build());
-    sheet.getRange(2, map.deleted + 1, maxRows - 1, 1).insertCheckboxes();
     sheet.getRange(2, map.updatedAt + 1, maxRows - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     sheet.getRange(2, map.lastPracticed + 1, maxRows - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     sheet.getRange(2, map.lyricImageLinks + 1, maxRows - 1, 1).setWrap(true);
@@ -55,6 +63,7 @@ function setup(){
   sheet.setColumnWidth(map.title + 1, 220);
   sheet.setColumnWidth(map.lyricPreview + 1, 160);
   sheet.setColumnWidth(map.lyricImageLinks + 1, 240);
+  compact_(sheet, map);
   getFolder_();
   getSecret_();
   refreshPreviews();
@@ -136,9 +145,13 @@ function doGet(e){
   const p = (e && e.parameter) || {};
   if(p.secret !== getSecret_()) return json_({ok:false, error:'Wrong secret key'});
   try{
-    if(p.action === 'ping') return json_({ok:true, sheet:SpreadsheetApp.getActive().getName()});
+    if(p.action === 'ping'){
+      const ss = SpreadsheetApp.getActive();
+      return json_({ok:true, spreadsheet:ss.getName(), tab:SHEET_NAME, url:ss.getUrl() + '#gid=' + getSheet_().getSheetId(), hymnRows:Math.max(0, getSheet_().getLastRow() - 1)});
+    }
     if(p.action === 'pull') return json_(pull_());
     if(p.action === 'image') return json_(image_(p.id, p.url));
+    if(p.action === 'audio') return json_(audio_(p.url));
     return json_({ok:false, error:'Unknown action'});
   }catch(err){ return json_({ok:false, error:String(err && err.message || err)}); }
 }
@@ -168,7 +181,8 @@ function pull_(){
   const map = headerMap_(sheet);
   const last = sheet.getLastRow();
   const rows = [];
-  if(last < 2) return {ok:true, rows};
+  const spreadsheetUrl = SpreadsheetApp.getActive().getUrl() + '#gid=' + sheet.getSheetId();
+  if(last < 2) return {ok:true, rows, spreadsheetUrl};
   const range = sheet.getRange(2, 1, last - 1, sheet.getLastColumn());
   const vals = range.getValues();
   const now = new Date();
@@ -200,7 +214,7 @@ function pull_(){
       deleted: v[map.deleted] === true || String(v[map.deleted]).toUpperCase() === 'TRUE'
     });
   }
-  return {ok:true, rows};
+  return {ok:true, rows, spreadsheetUrl};
 }
 
 function upsert_(rows){
@@ -217,6 +231,10 @@ function upsert_(rows){
       for(let c = 0; c < width; c++)
         if(formulas[r][c]) data[r][c] = formulas[r][c];
   }
+  // keep only real hymn rows (an empty row with just an unticked box is not a hymn),
+  // so everything is packed from row 2 down with no gaps
+  const oldLen = data.length;
+  data = data.filter(row => isHymnRow_(row, map));
   const index = {};
   data.forEach((row, i) => { if(row[map.id]) index[String(row[map.id])] = i; });
   let added = 0, updated = 0;
@@ -243,6 +261,11 @@ function upsert_(rows){
     }
     row[map.updatedAt] = r.updatedAt ? new Date(r.updatedAt) : new Date();
   });
+  if(oldLen > data.length){
+    const leftover = sheet.getRange(2 + data.length, 1, oldLen - data.length, width);
+    leftover.removeCheckboxes();
+    leftover.clearContent();
+  }
   if(data.length){
     // keep text columns as plain text so "3:25" or "1/2" isn't turned into a time/date
     ['id','title','category','celebration','length','audioLink'].forEach(f => {
@@ -281,6 +304,27 @@ function image_(id, url){
   return {ok:true, mime:blob.getContentType() || 'image/jpeg', data:Utilities.base64Encode(blob.getBytes())};
 }
 
+// Fetches an audio link on Google's side for the web app, which the browser itself isn't
+// allowed to read (most sites don't send CORS headers). Drive links you own are read directly.
+function audio_(url){
+  if(!url || !/^https?:\/\//i.test(url)) return {ok:false, error:'No audio link'};
+  let blob = null;
+  const id = driveId_(url);
+  if(id){
+    try{ blob = DriveApp.getFileById(id).getBlob(); }catch(e){ url = 'https://drive.google.com/uc?export=download&id=' + id; }
+  }
+  if(!blob){
+    const res = UrlFetchApp.fetch(url, {followRedirects:true, muteHttpExceptions:true});
+    if(res.getResponseCode() >= 400) return {ok:false, error:'The site answered HTTP ' + res.getResponseCode()};
+    blob = res.getBlob();
+  }
+  const type = blob.getContentType() || '';
+  if(/text\/html/i.test(type)) return {ok:false, error:'That link opens a web page, not an audio file'};
+  const bytes = blob.getBytes();
+  if(bytes.length > 45 * 1024 * 1024) return {ok:false, error:'Audio is too large to pass through the sheet (over 45 MB)'};
+  return {ok:true, mime:type || 'audio/mpeg', data:Utilities.base64Encode(bytes)};
+}
+
 function markDeleted_(ids){
   const sheet = getSheet_();
   const map = headerMap_(sheet);
@@ -311,6 +355,33 @@ function refreshPreviews(){
 }
 
 /* ---------------- helpers ---------------- */
+
+function isHymnRow_(row, map){
+  return !!(String(row[map.id] || '').trim() || String(row[map.title] || '').trim());
+}
+
+// Moves every hymn row up to start at row 2 and clears leftover empty/tickbox-only rows.
+function compact_(sheet, map){
+  const last = sheet.getLastRow();
+  if(last < 2) return;
+  const width = sheet.getLastColumn();
+  const range = sheet.getRange(2, 1, last - 1, width);
+  const vals = range.getValues(), formulas = range.getFormulas();
+  const rows = [];
+  vals.forEach((row, r) => {
+    if(!isHymnRow_(row, map)) return;
+    rows.push(row.map((v, c) => formulas[r][c] ? formulas[r][c] : v));
+  });
+  range.removeCheckboxes();
+  range.clearContent();
+  if(rows.length){
+    ['id','title','category','celebration','length','audioLink'].forEach(f => {
+      if(map[f] !== undefined) sheet.getRange(2, map[f] + 1, rows.length, 1).setNumberFormat('@');
+    });
+    sheet.getRange(2, 1, rows.length, width).setValues(rows);
+    sheet.getRange(2, map.deleted + 1, rows.length, 1).insertCheckboxes();
+  }
+}
 
 function getSheet_(){
   const ss = SpreadsheetApp.getActive();
