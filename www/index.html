@@ -547,6 +547,7 @@
           <button class="btn secondary block" id="sheetScanQrBtn" style="flex:1;">📷 Scan QR to connect</button>
           <button class="btn ghost" id="sheetShowQrBtn">Show QR</button>
         </div>
+        <button class="btn ghost block" id="sheetOpenBtn" style="width:100%; margin-top:8px;">📄 Open the Google Sheet</button>
         <div style="font-size:11.5px; color:var(--ink-soft); margin-top:8px;">Titles, category, month, celebration, audio links, status, length, practice count and lyric images sync both ways. Hymns with audio stored only on this phone sync without the audio file.</div>
       </div>
 
@@ -4634,6 +4635,10 @@ async function syncWithSheet({quiet=false}={}){
     renderSheetSyncStatus('Syncing… reading the sheet');
     const pulled = await sheetApiGet({action:'pull'});
     const rows = pulled.rows || [];
+    if(pulled.spreadsheetUrl && pulled.spreadsheetUrl !== sheetSync.sheetUrl){
+      sheetSync.sheetUrl = pulled.spreadsheetUrl;
+      await saveSheetSyncSettings();
+    }
     const tombRec = await dbGet('meta','syncDeletedIds');
     const tomb = (tombRec && tombRec.value) || [];
     const tombSet = new Set(tomb);
@@ -4877,6 +4882,31 @@ document.getElementById('qrCopyCodeBtn').addEventListener('click', async ()=>{
 document.getElementById('sheetSyncUrl').addEventListener('input', (e)=>{
   const conn = parseConnectionCode(e.target.value);
   if(conn) applyConnection(conn);
+});
+
+/* Opens the linked Google Sheet. Inside the Android app, navigating to an outside
+   address hands it to Android, which opens the Sheets app (or the browser) and
+   leaves this app where it was; in a browser it opens a new tab. */
+function openExternalUrl(url){
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if(isNative){ window.location.href = url; return; }
+  const w = window.open(url, '_blank', 'noopener');
+  if(!w) window.location.href = url;
+}
+function isSafeSheetUrl(u){ return /^https:\/\/docs\.google\.com\/spreadsheets\//.test(String(u||'')); }
+document.getElementById('sheetOpenBtn').addEventListener('click', async ()=>{
+  if(isSafeSheetUrl(sheetSync.sheetUrl)){ openExternalUrl(sheetSync.sheetUrl); return; }
+  if(!sheetSyncConfigured()){ toast('Connect to your sheet first'); return; }
+  try{
+    toast('Finding your sheet…');
+    const res = await sheetApiGet({action:'ping'});
+    if(isSafeSheetUrl(res.url)){
+      sheetSync.sheetUrl = res.url; await saveSheetSyncSettings();
+      openExternalUrl(res.url);
+    } else {
+      toast('Update the script in your sheet (new Code.gs + New version deploy) to enable this');
+    }
+  }catch(e){ toast('Could not reach the sheet: '+(e && e.message ? e.message : 'error')); }
 });
 
 async function init(){
