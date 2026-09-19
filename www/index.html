@@ -898,13 +898,18 @@
 
       <div class="subpane" id="pane-phrases">
         <div style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">
-          Mark where each phrase starts (or auto-suggest from silence gaps). Tap a phrase to loop it; tap its dot to mark how well you know it.
+          Mark where each phrase starts (or auto-suggest from the breaths and pauses). Tap a phrase to loop it; tap its dot to mark how well you know it.
         </div>
         <div class="row" style="margin-bottom:8px;">
           <button class="btn secondary block" id="markBoundaryBtn" style="flex:1;">+ Mark boundary here</button>
           <button class="btn secondary block" id="autoSuggestBtn" style="flex:1;">✨ Auto-suggest</button>
         </div>
         <div id="autoSuggestProgress" style="font-size:12px; color:var(--ink-soft); margin-bottom:8px; display:none;"></div>
+        <div id="autoSuggestTune" style="display:none; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="flex:1; font-size:13px;">Suggested: <b id="autoSuggestCount"></b></span>
+          <button class="btn ghost" id="autoFewerBtn" style="padding:6px 12px;">− Fewer</button>
+          <button class="btn ghost" id="autoMoreBtn" style="padding:6px 12px;">+ More</button>
+        </div>
         <div class="phrase-map" id="phraseMap"></div>
         <button class="btn ghost block" id="clearPhrasesBtn" style="margin-top:10px;">Clear all phrases</button>
       </div>
@@ -3340,6 +3345,7 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
 
   currentHymn = h;
   if(typeof applyAppBackground==='function') applyAppBackground();
+  { const tune = document.getElementById('autoSuggestTune'); if(tune) tune.style.display='none'; }
   currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
   queueIndex = currentQueue.indexOf(hymnId);
   pageIndex = 0;
@@ -3981,16 +3987,107 @@ function updatePhraseMapProgress(){
   });
 }
 
-/* Auto-suggest phrase boundaries by decoding the audio and finding
-   gaps of low volume (silence) between phrases. Best-effort — some
-   hymns won't have clean enough gaps for this to find anything. */
+/* Auto-suggest phrase boundaries. Chant recordings rarely go fully silent
+   (reverb, room noise, kebero/tsenatsil), so instead of looking for silence
+   this follows the loudness envelope and finds the *dips* — breaths and
+   pauses — scoring each by how far it drops below the singing on both
+   sides. The deepest, reasonably spaced dips become boundaries; Fewer /
+   More then re-picks from the same analysis without decoding again. */
+let autoSuggestState = null; // {hymnId, base:[], cands:[{t,prom}], k, soundStart, soundEnd}
+
+function analyzeDips(audioBuffer){
+  const sr = audioBuffer.sampleRate;
+  const nCh = audioBuffer.numberOfChannels;
+  const chs = []; for(let c=0;c<Math.min(nCh,2);c++) chs.push(audioBuffer.getChannelData(c));
+  const len = chs[0].length;
+  const hop = Math.floor(sr*0.02); // 20 ms frames
+  const db = [];
+  for(let i=0;i<len;i+=hop){
+    const end = Math.min(i+hop, len);
+    let sum = 0;
+    for(let j=i;j<end;j++){ let v = chs[0][j]; if(chs[1]) v = (v + chs[1][j]) * 0.5; sum += v*v; }
+    db.push(10*Math.log10(sum/(end-i) + 1e-10));
+  }
+  // smooth ~160 ms so single consonants/drum hits don't count as dips
+  const W = 4, env = new Array(db.length);
+  for(let i=0;i<db.length;i++){
+    let s=0, n=0;
+    for(let k=Math.max(0,i-W); k<=Math.min(db.length-1,i+W); k++){ s+=db[k]; n++; }
+    env[i] = s/n;
+  }
+  const sorted = env.slice().sort((a,b)=>a-b);
+  const floor = sorted[Math.floor(sorted.length*0.05)];
+  const loud = sorted[Math.floor(sorted.length*0.95)];
+  const soundLevel = floor + Math.max(6, (loud-floor)*0.25);
+  let first = env.findIndex(v=>v > soundLevel); if(first < 0) first = 0;
+  let last = env.length-1; while(last > 0 && env[last] <= soundLevel) last--;
+  const fps = 1/0.02;
+  const nb = Math.round(0.25*fps), side = Math.round(3*fps);
+  const cands = [];
+  for(let i=first+nb; i<=last-nb; i++){
+    let isMin = true;
+    for(let k=i-nb; k<=i+nb; k++){ if(env[k] < env[i]){ isMin=false; break; } }
+    if(!isMin) continue;
+    let lp = -Infinity, rp = -Infinity;
+    for(let k=Math.max(first,i-side); k<i; k++) if(env[k]>lp) lp=env[k];
+    for(let k=i+1; k<=Math.min(last,i+side); k++) if(env[k]>rp) rp=env[k];
+    const prom = Math.min(lp, rp) - env[i];
+    if(!(prom >= 2)) continue;
+    // centre the cut in the breath: widen while still near the bottom of the dip
+    let a=i, b=i; const lim = env[i] + Math.min(3, prom*0.3);
+    while(a>first && env[a-1] <= lim) a--;
+    while(b<last && env[b+1] <= lim) b++;
+    const t = ((a+b)/2) * 0.02;
+    const prev = cands[cands.length-1];
+    if(prev && t - prev.t < 0.6){ if(prom > prev.prom){ prev.t = t; prev.prom = prom; } continue; }
+    cands.push({t, prom});
+  }
+  return {cands, soundStart:first*0.02, soundEnd:last*0.02};
+}
+function pickDips(state, k){
+  const byDepth = state.cands.slice().sort((a,b)=>b.prom-a.prom);
+  for(const minLen of [3, 2, 1.2]){
+    const chosen = [];
+    for(const c of byDepth){
+      if(chosen.length >= k) break;
+      if(c.t - state.soundStart < minLen*0.5 || state.soundEnd - c.t < minLen*0.5) continue;
+      if(chosen.every(x=>Math.abs(x-c.t) >= minLen)) chosen.push(c.t);
+    }
+    if(chosen.length >= k || minLen === 1.2) return chosen.sort((a,b)=>a-b);
+  }
+  return [];
+}
+function defaultDipCount(state){
+  // every clear dip (≥ 5 dB) with at least ~3 s between phrases
+  const strong = {...state, cands: state.cands.filter(c=>c.prom >= 5)};
+  let n = pickDips(strong, 999).length;
+  if(!n && state.cands.length) n = Math.min(3, pickDips(state, 999).length);
+  return n;
+}
+async function applyAutoSuggest(){
+  const st = autoSuggestState;
+  if(!st || !currentHymn || currentHymn.id !== st.hymnId) return;
+  const chosen = pickDips(st, st.k);
+  st.k = chosen.length;
+  await rebuildPhraseSections([...st.base, ...chosen]);
+  const n = (currentHymn.sections||[]).length;
+  document.getElementById('autoSuggestTune').style.display = 'flex';
+  document.getElementById('autoSuggestCount').textContent = n + ' phrase' + (n===1?'':'s');
+  document.getElementById('autoFewerBtn').disabled = st.k <= 0;
+  document.getElementById('autoMoreBtn').disabled = pickDips(st, st.k+1).length <= st.k;
+}
 async function autoSuggestBoundaries(){
   if(!currentHymn){ toast('Load a hymn first'); return; }
   const url = await getAudioPlaybackUrl(currentHymn);
   if(!url){ toast('No audio to analyze'); return; }
+  let base = [];
+  if((currentHymn.sections||[]).length > 1){
+    base = confirm('Replace your current phrases with suggested ones?\n\nOK = replace   ·   Cancel = keep them and add suggestions') ? [] : getPhraseBoundaries();
+  }
   const progressEl = document.getElementById('autoSuggestProgress');
   progressEl.style.display='block';
   progressEl.textContent='Fetching audio…';
+  document.getElementById('autoSuggestTune').style.display='none';
   try{
     const blob = await fetchAudioBlob(url, t=>{ progressEl.textContent = t; });
     // a link that had to be fetched the long way is kept as an offline copy, so next time is instant
@@ -3998,42 +4095,20 @@ async function autoSuggestBoundaries(){
       saveOfflineCopy(currentHymn, blob).catch(()=>{});
     }
     const buf = await blob.arrayBuffer();
-    progressEl.textContent='Analyzing for silence gaps…';
+    progressEl.textContent='Listening for breaths and pauses…';
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if(!Ctx) throw new Error('audio analysis not supported in this browser');
     const ctx = new Ctx();
-    const audioBuffer = await ctx.decodeAudioData(buf);
-    const data = audioBuffer.getChannelData(0);
-    const sampleRate = audioBuffer.sampleRate;
-    const windowSize = Math.floor(sampleRate*0.05); // 50ms windows
-    const rms = [];
-    for(let i=0;i<data.length;i+=windowSize){
-      let sum=0;
-      const end=Math.min(i+windowSize, data.length);
-      for(let j=i;j<end;j++) sum += data[j]*data[j];
-      rms.push(Math.sqrt(sum/(end-i)));
-    }
-    ctx.close();
-    const maxRms = Math.max(...rms, 0.0001);
-    const threshold = maxRms*0.08;
-    const minSilenceWindows = Math.ceil(0.4/0.05); // ~0.4s of near-silence
-    const boundaries = [];
-    let silenceStart=-1;
-    for(let i=0;i<rms.length;i++){
-      if(rms[i]<threshold){
-        if(silenceStart===-1) silenceStart=i;
-      } else {
-        if(silenceStart!==-1 && (i-silenceStart)>=minSilenceWindows){
-          boundaries.push(Math.floor((silenceStart+i)/2)*windowSize/sampleRate);
-        }
-        silenceStart=-1;
-      }
-    }
-    if(!boundaries.length){
-      toast('No clear silence gaps found — try marking manually instead');
+    const audioBuffer = await new Promise((res, rej)=>{ const p = ctx.decodeAudioData(buf, res, rej); if(p && p.then) p.then(res, rej); });
+    ctx.close && ctx.close();
+    const res = analyzeDips(audioBuffer);
+    if(!res.cands.length){
+      toast('No clear pauses found — mark phrases with “+ Mark boundary here” instead');
     } else {
-      await rebuildPhraseSections([...getPhraseBoundaries(), ...boundaries]);
-      toast(boundaries.length+' phrase boundary(ies) suggested');
+      autoSuggestState = {hymnId:currentHymn.id, base, cands:res.cands, soundStart:res.soundStart, soundEnd:res.soundEnd, k:0};
+      autoSuggestState.k = defaultDipCount(autoSuggestState);
+      await applyAutoSuggest();
+      toast('Suggested ' + (currentHymn.sections||[]).length + ' phrases — use Fewer / More to adjust');
     }
   }catch(err){
     toast('Could not analyze audio: '+(err && err.message ? err.message : 'unknown error'));
@@ -4041,6 +4116,9 @@ async function autoSuggestBoundaries(){
   progressEl.style.display='none';
 }
 document.getElementById('autoSuggestBtn').addEventListener('click', autoSuggestBoundaries);
+document.getElementById('autoFewerBtn').addEventListener('click', ()=>{ if(autoSuggestState && autoSuggestState.k>0){ autoSuggestState.k--; applyAutoSuggest(); } });
+document.getElementById('autoMoreBtn').addEventListener('click', ()=>{ if(autoSuggestState){ autoSuggestState.k++; applyAutoSuggest(); } });
+
 
 
 function stepper(id, delta){
