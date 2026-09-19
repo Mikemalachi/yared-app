@@ -62,6 +62,7 @@ jobs:
           mkdir -p android/app/src/main/java/com/yared/hymntracker
           mkdir -p android/app/src/main/res/layout
           mkdir -p android/app/src/main/res/xml
+          mkdir -p android/app/src/main/res/drawable
           cp native-templates/MainActivity.java android/app/src/main/java/com/yared/hymntracker/MainActivity.java
           cp native-templates/PlaybackService.java android/app/src/main/java/com/yared/hymntracker/PlaybackService.java
           cp native-templates/PlaybackNotificationPlugin.java android/app/src/main/java/com/yared/hymntracker/PlaybackNotificationPlugin.java
@@ -74,6 +75,7 @@ jobs:
           cp native-templates/UrlDownloaderPlugin.java android/app/src/main/java/com/yared/hymntracker/UrlDownloaderPlugin.java
           cp native-templates/res/layout/widget_due_hymns.xml android/app/src/main/res/layout/widget_due_hymns.xml
           cp native-templates/res/xml/due_hymns_widget_info.xml android/app/src/main/res/xml/due_hymns_widget_info.xml
+          cp native-templates/res/drawable/*.xml android/app/src/main/res/drawable/
 
       - name: Add Maven Central mirror fallback
         run: |

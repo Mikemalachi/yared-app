@@ -72,6 +72,8 @@ public class DueHymnsWidgetProvider extends AppWidgetProvider {
             PendingIntent openPending = openAppIntent(context);
             views.setOnClickPendingIntent(R.id.widget_title, openPending);
             views.setOnClickPendingIntent(R.id.widget_due_summary, openPending);
+            views.setOnClickPendingIntent(R.id.widget_icon, openPending);
+            views.setOnClickPendingIntent(R.id.widget_status, openPending);
 
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }

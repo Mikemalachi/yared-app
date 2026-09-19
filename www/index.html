@@ -911,12 +911,20 @@
             <button class="btn ghost" id="autoFewerBtn" style="padding:6px 12px;">− Fewer</button>
             <button class="btn ghost" id="autoMoreBtn" style="padding:6px 12px;">+ More</button>
           </div>
-          <label style="font-size:12.5px;">Pause depth: <b id="autoThrVal"></b> <span style="color:var(--ink-soft);">(lower = more phrases)</span>
-            <input type="range" id="autoThreshold" min="2" max="20" step="0.5" value="5" style="width:100%;">
-          </label>
-          <label style="font-size:12.5px;">Shortest phrase: <b id="autoMinLenVal"></b>
-            <input type="range" id="autoMinLen" min="1" max="12" step="0.5" value="3" style="width:100%;">
-          </label>
+          <details id="autoTuneMore">
+            <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft); padding:2px 0;">⚙ Adjust sensitivity</summary>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+          <details id="autoTuneDetails">
+            <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft); padding:2px 0;">⚙ Fine-tune detection</summary>
+            <label style="display:block; font-size:12.5px; margin-top:6px;">Pause depth: <b id="autoThrVal"></b> <span style="color:var(--ink-soft);">(lower = more phrases)</span>
+              <input type="range" id="autoThreshold" min="2" max="20" step="0.5" value="5" style="width:100%;">
+            </label>
+            <label style="display:block; font-size:12.5px; margin-top:4px;">Shortest phrase: <b id="autoMinLenVal"></b>
+              <input type="range" id="autoMinLen" min="1" max="12" step="0.5" value="3" style="width:100%;">
+            </label>
+          </details>
+            </div>
+          </details>
         </div>
         <div class="phrase-map" id="phraseMap"></div>
         <button class="btn ghost block" id="clearPhrasesBtn" style="margin-top:10px;">Clear all phrases</button>
@@ -2011,6 +2019,31 @@ const EXT_BY_MIME = {
   'audio/mpeg':'mp3', 'audio/mp3':'mp3', 'audio/mp4':'m4a', 'audio/x-m4a':'m4a',
   'audio/ogg':'ogg', 'audio/wav':'wav', 'audio/x-wav':'wav', 'audio/webm':'webm', 'audio/aac':'aac'
 };
+function baseMime(t){ return String(t||'').split(';')[0].trim().toLowerCase(); }
+/* Converts any recording the browser can decode into a plain 16-bit WAV — plays
+   everywhere and Android's Music library accepts it (webm recordings it may refuse). */
+async function blobToWav(blob){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  try{
+    const ab = await blob.arrayBuffer();
+    const buf = await new Promise((res, rej)=>{ const p = ctx.decodeAudioData(ab, res, rej); if(p && p.then) p.then(res, rej); });
+    const n = buf.length, sr = buf.sampleRate, chs = Math.min(2, buf.numberOfChannels);
+    const out = new DataView(new ArrayBuffer(44 + n*2));
+    const w = (o, str)=>{ for(let i=0;i<str.length;i++) out.setUint8(o+i, str.charCodeAt(i)); };
+    w(0,'RIFF'); out.setUint32(4, 36 + n*2, true); w(8,'WAVE'); w(12,'fmt ');
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, sr, true); out.setUint32(28, sr*2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+    w(36,'data'); out.setUint32(40, n*2, true);
+    const c0 = buf.getChannelData(0), c1 = chs > 1 ? buf.getChannelData(1) : null;
+    for(let i=0;i<n;i++){
+      let v = c1 ? (c0[i] + c1[i]) * 0.5 : c0[i];
+      v = Math.max(-1, Math.min(1, v));
+      out.setInt16(44 + i*2, v < 0 ? v*0x8000 : v*0x7FFF, true);
+    }
+    return new Blob([out.buffer], {type:'audio/wav'});
+  } finally { try{ ctx.close(); }catch(e){} }
+}
 function sanitizeFilenamePart(s){
   return (s||'').replace(/[\\/:*?"<>|]/g,'').trim() || 'Untitled';
 }
@@ -2054,7 +2087,7 @@ async function ensureFileAccess(){
    falling back to a plain browser download (best-effort path hint only)
    when the native plugin isn't available. */
 async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
-  const ext = EXT_BY_MIME[blob.type] || 'mp3';
+  const ext = EXT_BY_MIME[baseMime(blob.type)] || 'mp3';
   const filename = `${sanitizeFilenamePart(title)}.${ext}`;
   const subPath = [sanitizeFilenamePart(month||'Unsorted'), sanitizeFilenamePart(celebration||'Uncategorized'), extraSub?sanitizeFilenamePart(extraSub):null]
     .filter(Boolean).join('/');
@@ -2065,9 +2098,23 @@ async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
     if(!ok) return;
     toast('Saving…');
     try{
-      const data = await blobToBase64(blob);
-      const result = await plugin.save({data, filename, subPath, mimeType: blob.type||'audio/mpeg'});
-      toast(result && result.path ? 'Saved to Music/Yared music/'+subPath : 'Saved');
+      const mimeType = baseMime(blob.type) || 'audio/mpeg';
+      let result;
+      if(plugin.beginChunked){
+        // send in small pieces so large files don't overwhelm the app bridge
+        const {token} = await plugin.beginChunked();
+        const CH = 512*1024;
+        for(let off=0; off<blob.size; off+=CH){
+          const data = await blobToBase64(blob.slice(off, off+CH));
+          await plugin.appendChunk({token, data});
+          if(blob.size > 4*CH) toast('Saving… ' + Math.min(100, Math.round((off+CH)/blob.size*100)) + '%');
+        }
+        result = await plugin.finishChunked({token, filename, subPath, mimeType});
+      } else {
+        const data = await blobToBase64(blob);
+        result = await plugin.save({data, filename, subPath, mimeType});
+      }
+      toast(result && result.path ? 'Saved to ' + result.path : 'Saved');
     }catch(err){
       toast('Could not save file: '+(err && err.message ? err.message : 'unknown error'));
     }
@@ -2092,13 +2139,11 @@ async function downloadHymnAudio(hymnId){
     if(!blob && h.audioType==='file' && h.audioId){ const rec = await dbGet('media', h.audioId); blob = rec && rec.blob; }
     if(!blob && h.audioType==='link' && h.audioUrl){
       toast('Fetching audio…');
-      const resp = await fetch(h.audioUrl);
-      if(!resp.ok) throw new Error('bad response');
-      blob = await resp.blob();
+      blob = await fetchAudioBlob(h.audioUrl, t=>toast(t));
+      saveOfflineCopy(h, blob).catch(()=>{}); // keep it offline too, so it plays without internet
     }
   }catch(err){
-    toast('Could not fetch this audio — opening the link instead');
-    if(h.audioUrl) window.open(h.audioUrl, '_blank');
+    toast('Could not fetch this audio: ' + (err && err.message ? err.message : 'unknown error'));
     return;
   }
   if(!blob){ toast('No audio attached to this hymn'); return; }
@@ -2111,7 +2156,12 @@ async function downloadRecording(hymnId, recordingId){
   if(!rec) return;
   const mediaRec = await dbGet('media', rec.mediaId);
   if(!mediaRec || !mediaRec.blob){ toast('Recording not found'); return; }
-  await saveAudioToDevice(mediaRec.blob, {
+  let out = mediaRec.blob;
+  if(!/^audio\/(mpeg|mp3|wav|x-wav)$/.test(baseMime(out.type))){
+    toast('Preparing recording…');
+    try{ out = await blobToWav(out); }catch(e){ /* keep the original if this browser can't decode it */ }
+  }
+  await saveAudioToDevice(out, {
     month:h.month, celebration:h.celebration, extraSub:'Recording',
     title: `${h.title} - ${rec.label}`
   });
@@ -3165,7 +3215,7 @@ document.getElementById('toggleRecordBtn').addEventListener('click', async ()=>{
     mediaRecorder = new MediaRecorder(recStream);
     mediaRecorder.ondataavailable = (e)=>{ if(e.data.size>0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = async ()=>{
-      const blob = new Blob(recordedChunks, {type:'audio/webm'});
+      const blob = new Blob(recordedChunks, {type: baseMime(mediaRecorder.mimeType) || 'audio/webm'});
       const mediaId = uid();
       await dbPut('media', {id:mediaId, blob});
       currentHymn.recordings = currentHymn.recordings||[];
@@ -5181,6 +5231,9 @@ async function syncWithSheet({quiet=false}={}){
       await dbPut('meta', {key:'syncDeletedIds', value:[]});
     }
 
+    // 4b. celebration background pictures (Celebrations tab)
+    await syncCelebrationBackgrounds(pulled.celebrations, counts);
+
     // 5. remember what both sides agree on now
     for(const h of localById.values()){
       const v = hymnSheetValues(h);
@@ -5196,6 +5249,7 @@ async function syncWithSheet({quiet=false}={}){
     if(counts.sent) parts.push(counts.sent+' sent');
     if(counts.imagesIn+counts.imagesOut) parts.push((counts.imagesIn+counts.imagesOut)+' image(s)');
     if(counts.imageErrors) parts.push(counts.imageErrors+' image(s) failed');
+    if(counts.celSent) parts.push(counts.celSent+' celebration picture(s) sent');
     sheetSync.lastSyncAt = Date.now();
     sheetSync.lastMsg = parts.length ? parts.join(', ') : 'up to date';
     await saveSheetSyncSettings();
@@ -5215,6 +5269,76 @@ async function syncWithSheet({quiet=false}={}){
   sheetSyncRunning = false;
   btn.disabled = false; btn.textContent = 'Sync now';
   renderSheetSyncStatus();
+}
+
+/* ---------- celebration background pictures ↔ "Celebrations" tab ---------- */
+async function syncCelebrationBackgrounds(remoteRows, counts){
+  if(!Array.isArray(remoteRows)) return; // older script without the Celebrations tab
+  const remote = new Map(remoteRows.map(r=>[celKey(r.name), r]));
+  const keys = new Set([...remote.keys(), ...Object.keys(appearance.cel), ...Object.keys(appearance.celDeleted||{})]);
+  const push = [];
+  let changed = false;
+  for(const k of keys){
+    if(!k) continue;
+    const L = appearance.cel[k], T = (appearance.celDeleted||{})[k], R = remote.get(k);
+    const localTs = L ? (L.updatedAt || 1) : (T ? T.ts : 0);
+    const remoteTs = R ? (R.updatedAt || 0) : 0;
+    if(R && remoteTs > localTs){
+      // the sheet is newer: take its picture (or its removal)
+      if(R.link){
+        if(!L || sheetLinkKey(L.link||'') !== sheetLinkKey(R.link)){
+          try{
+            renderSheetSyncStatus('Syncing… downloading picture for “'+R.name+'”');
+            const k2 = sheetLinkKey(R.link);
+            const driveId = k2.startsWith('drive:') ? k2.slice(6) : '';
+            const res = await sheetApiGet(driveId ? {action:'image', id:driveId} : {action:'image', url:R.link});
+            const blob = dataUrlToBlob('data:'+(res.mime||'image/jpeg')+';base64,'+res.data);
+            const mediaId = 'bg-cel-' + uid();
+            await dbPut('media', {id:mediaId, blob});
+            if(L) dbDelete('media', L.mediaId).catch(()=>{});
+            appearance.cel[k] = {name:R.name, mediaId, link:R.link, driveId:driveId||undefined, updatedAt:remoteTs};
+            counts.imagesIn++; changed = true;
+          }catch(e){ counts.imageErrors++; }
+        } else { L.updatedAt = remoteTs; changed = true; }
+        if(appearance.celDeleted) delete appearance.celDeleted[k];
+      } else if(L){
+        await dbDelete('media', L.mediaId).catch(()=>{});
+        delete appearance.cel[k];
+        changed = true;
+      }
+    } else if(localTs > remoteTs){
+      // this device is newer: send its picture (or its removal)
+      if(L){
+        if(!L.link){
+          try{
+            renderSheetSyncStatus('Syncing… uploading picture for “'+L.name+'”');
+            const rec = await dbGet('media', L.mediaId);
+            if(!rec || !rec.blob) continue;
+            const mime = rec.blob.type || 'image/jpeg';
+            const dataUrl = await blobToDataUrl(rec.blob);
+            const res = await sheetApiPost({action:'uploadImage', hymnId:'background', mime,
+              name:'Background - '+L.name+'.'+((mime.split('/')[1]||'jpg').replace('jpeg','jpg')), data:dataUrl.split(',')[1]});
+            L.link = res.link; L.driveId = res.id; changed = true;
+            counts.imagesOut++;
+            saveAppearance(); // keep the link even if a later step fails, so it isn't uploaded twice
+          }catch(e){ counts.imageErrors++; continue; }
+        }
+        push.push({name:L.name, link:L.link, updatedAt:L.updatedAt || Date.now()});
+      } else if(T){
+        push.push({name:T.name, link:'', updatedAt:T.ts});
+      }
+    }
+  }
+  if(push.length){
+    renderSheetSyncStatus('Syncing… sending celebration pictures');
+    await sheetApiPost({action:'celebrations', rows:push});
+    counts.celSent = push.length;
+  }
+  if(changed || push.length){
+    saveAppearance();
+    applyAppBackground();
+    if(document.getElementById('celBgDetails') && document.getElementById('celBgDetails').open) renderCelebrationBgList();
+  }
 }
 function maybeAutoSheetSync(minGapMs){
   if(!sheetSync.auto || !sheetSyncConfigured() || sheetSyncRunning) return;
@@ -5858,7 +5982,7 @@ document.getElementById('kbSoundCustom').addEventListener('click', ()=>{
    (or the last-played hymn at start-up); a celebration with no
    picture keeps the plain theme background.
    ============================================================ */
-let appearance = {enabled:true, opLight:8, opDark:10, size:'fit', gray:false, cel:{}};
+let appearance = {enabled:true, opLight:8, opDark:10, size:'fit', gray:false, cel:{}, celDeleted:{}};
 let appearanceReady = false;
 let bgLastPlayedId = null;
 let bgApplyToken = 0;
@@ -5873,6 +5997,7 @@ async function loadAppearance(){
       appearance = Object.assign(appearance, {opLight:v.opLight, opDark:v.opDark, size:v.size, gray:v.gray});
       if(v.enabled !== undefined) appearance.enabled = v.enabled;
       appearance.cel = v.cel || {};
+      appearance.celDeleted = v.celDeleted || {};
       ['opLight','opDark'].forEach(k=>{ if(typeof appearance[k] !== 'number') appearance[k] = k==='opLight' ? 8 : 10; });
       if(!appearance.size) appearance.size = 'fit';
     }
@@ -5946,6 +6071,7 @@ async function renderCelebrationBgList(){
     const e = appearance.cel[k];
     if(!e) return;
     delete appearance.cel[k];
+    appearance.celDeleted[k] = {name:e.name, ts:Date.now()}; // so the removal syncs to other devices
     saveAppearance();
     await dbDelete('media', e.mediaId).catch(()=>{});
     renderCelebrationBgList(); applyAppBackground();
@@ -5984,7 +6110,8 @@ document.getElementById('bgFileInput').addEventListener('change', async (e)=>{
     const old = appearance.cel[k];
     const mediaId = 'bg-cel-' + uid();
     await dbPut('media', {id:mediaId, blob});
-    appearance.cel[k] = {name:bgPickFor, mediaId};
+    appearance.cel[k] = {name:bgPickFor, mediaId, updatedAt:Date.now()}; // no link yet → uploaded on next sync
+    delete appearance.celDeleted[k];
     saveAppearance();
     if(old) dbDelete('media', old.mediaId).catch(()=>{});
     renderCelebrationBgList(); applyAppBackground();

@@ -12,6 +12,8 @@
  */
 
 const SHEET_NAME = 'Hymns';
+const CEL_SHEET_NAME = 'Celebrations';
+const CEL_HEADERS = ['celebration','imageLink','preview','updatedAt'];
 const FOLDER_NAME = 'Yared Hymn Tracker Lyrics';
 const HEADERS = ['id','title','category','month','celebration','audioLink','status',
                  'length','practiceCount','lastPracticed','lyricImageLinks','lyricPreview',
@@ -64,6 +66,8 @@ function setup(){
   sheet.setColumnWidth(map.lyricPreview + 1, 160);
   sheet.setColumnWidth(map.lyricImageLinks + 1, 240);
   compact_(sheet, map);
+  getCelSheet_();
+  ss.setActiveSheet(sheet);
   getFolder_();
   getSecret_();
   refreshPreviews();
@@ -112,6 +116,7 @@ function saveWebAppUrl(url){
 function onEdit(e){
   try{
     const sheet = e.range.getSheet();
+    if(sheet.getName() === CEL_SHEET_NAME){ celOnEdit_(sheet, e.range); return; }
     if(sheet.getName() !== SHEET_NAME) return;
     const r0 = e.range.getRow(), nRows = e.range.getNumRows();
     if(r0 + nRows - 1 < 2) return;
@@ -166,6 +171,7 @@ function doPost(e){
     if(body.action === 'upsert') return json_(upsert_(body.rows || []));
     if(body.action === 'uploadImage') return json_(uploadImage_(body));
     if(body.action === 'delete') return json_(markDeleted_(body.ids || []));
+    if(body.action === 'celebrations') return json_(upsertCel_(body.rows || []));
     return json_({ok:false, error:'Unknown action'});
   }catch(err){
     return json_({ok:false, error:String(err && err.message || err)});
@@ -182,7 +188,7 @@ function pull_(){
   const last = sheet.getLastRow();
   const rows = [];
   const spreadsheetUrl = SpreadsheetApp.getActive().getUrl() + '#gid=' + sheet.getSheetId();
-  if(last < 2) return {ok:true, rows, spreadsheetUrl};
+  if(last < 2) return {ok:true, rows, spreadsheetUrl, celebrations:pullCel_()};
   const range = sheet.getRange(2, 1, last - 1, sheet.getLastColumn());
   const vals = range.getValues();
   const now = new Date();
@@ -214,7 +220,7 @@ function pull_(){
       deleted: v[map.deleted] === true || String(v[map.deleted]).toUpperCase() === 'TRUE'
     });
   }
-  return {ok:true, rows, spreadsheetUrl};
+  return {ok:true, rows, spreadsheetUrl, celebrations:pullCel_()};
 }
 
 function upsert_(rows){
@@ -355,6 +361,71 @@ function refreshPreviews(){
   vals.forEach((v, i) => setPreview_(sheet, map, i + 2, String(v[0] || '')));
 }
 
+/* ---------------- celebration background pictures ---------------- */
+// Tab "Celebrations": one row per celebration with a picture link (Drive or any image URL).
+// A blank imageLink with a newer updatedAt means the picture was removed.
+
+function getCelSheet_(){
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(CEL_SHEET_NAME);
+  if(!sh){
+    sh = ss.insertSheet(CEL_SHEET_NAME);
+    sh.getRange(1, 1, 1, CEL_HEADERS.length).setValues([CEL_HEADERS])
+      .setFontWeight('bold').setBackground('#2b2118').setFontColor('#f3e9d2');
+    sh.setFrozenRows(1);
+    sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 260); sh.setColumnWidth(3, 140);
+    sh.getRange(2, 4, sh.getMaxRows() - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
+    sh.getRange(2, 1, sh.getMaxRows() - 1, 2).setNumberFormat('@');
+  }
+  return sh;
+}
+function celKey_(name){ return String(name || '').trim().toLowerCase(); }
+function pullCel_(){
+  const sh = getCelSheet_();
+  const last = sh.getLastRow();
+  if(last < 2) return [];
+  return sh.getRange(2, 1, last - 1, 4).getValues()
+    .filter(r => String(r[0]).trim())
+    .map(r => ({name:String(r[0]).trim(), link:splitLinks_(r[1])[0] || '', updatedAt:toMs_(r[3])}));
+}
+function upsertCel_(rows){
+  const sh = getCelSheet_();
+  const last = sh.getLastRow();
+  const vals = last >= 2 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
+  const index = {};
+  vals.forEach((r, i) => { const k = celKey_(r[0]); if(k) index[k] = i; });
+  rows.forEach(r => {
+    const k = celKey_(r.name); if(!k) return;
+    let i = index[k];
+    if(i === undefined){ vals.push([r.name, '', '', '']); i = vals.length - 1; index[k] = i; }
+    vals[i][0] = r.name;
+    vals[i][1] = r.link || '';
+    vals[i][2] = previewFormula_(r.link || '');
+    vals[i][3] = r.updatedAt ? new Date(r.updatedAt) : new Date();
+  });
+  if(vals.length){
+    sh.getRange(2, 1, vals.length, 2).setNumberFormat('@');
+    sh.getRange(2, 1, vals.length, 4).setValues(vals);
+    for(let r = 0; r < vals.length; r++) if(vals[r][1] && sh.getRowHeight(r + 2) < 90) sh.setRowHeight(r + 2, 110);
+  }
+  return {ok:true, count:rows.length};
+}
+function celOnEdit_(sh, range){
+  const r0 = Math.max(2, range.getRow()), r1 = range.getRow() + range.getNumRows() - 1;
+  if(r1 < 2) return;
+  if(range.getColumn() > 2) return; // only name / link edits count
+  const now = new Date();
+  for(let r = r0; r <= r1; r++){
+    const name = String(sh.getRange(r, 1).getValue()).trim();
+    if(!name) continue;
+    const link = splitLinks_(sh.getRange(r, 2).getValue())[0] || '';
+    const f = previewFormula_(link);
+    if(f) sh.getRange(r, 3).setFormula(f); else sh.getRange(r, 3).setValue('');
+    sh.getRange(r, 4).setValue(now);
+    if(link && sh.getRowHeight(r) < 90) sh.setRowHeight(r, 110);
+  }
+}
+
 /* ---------------- helpers ---------------- */
 
 function isHymnRow_(row, map){
@@ -423,7 +494,8 @@ function getSecret_(){
 
 function setPreview_(sheet, map, row, linksText){
   const first = splitLinks_(linksText)[0];
-  sheet.getRange(row, map.lyricPreview + 1).setFormula(previewFormula_(first) || '');
+  const f = previewFormula_(first);
+  if(f) sheet.getRange(row, map.lyricPreview + 1).setFormula(f); else sheet.getRange(row, map.lyricPreview + 1).setValue('');
   if(first && sheet.getRowHeight(row) < 90) sheet.setRowHeight(row, 110);
 }
 

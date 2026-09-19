@@ -39,6 +39,8 @@ Typing the URL and secret key by hand under **Connection** still works too.
 | lyricPreview | shows page 1 of the lyrics inside the sheet |
 | deleted | tick it to delete a hymn from the phone on its next sync; hymns deleted on the phone get ticked here |
 
+**Celebrations tab** — one row per celebration with its background picture (`imageLink`, a Drive or any image link) and a preview. Pictures set in the app are uploaded here and appear on your other devices; clearing a link removes that picture everywhere. The newest change wins.
+
 * Add a hymn from the sheet by typing a new row with at least a title — an id is filled in automatically.
 * Don't delete rows in the sheet; tick **deleted** instead (a missing row is simply put back from the phone).
 * Audio stored only on the phone is not uploaded; add a link in **audioLink** if you want it in the sheet.
