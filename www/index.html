@@ -260,6 +260,27 @@
     border:1px dashed var(--line);}
   .cel-bg-row .th.set{border-style:solid;}
   .cel-bg-row .nm{flex:1; font-size:13px;}
+  /* Folder picker */
+  .fp{margin-bottom:10px;}
+  .fp-crumbs{display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin-bottom:6px;}
+  .fp-crumb{background:none; border:none; padding:4px 6px; border-radius:8px; font-size:13px; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .fp-crumb.on{color:var(--ink); font-weight:700; background:var(--parchment-dim);}
+  .fp-sep{color:var(--ink-soft); font-size:12px;}
+  .fp-edit{background:none; border:none; font-size:13px; color:var(--gold); cursor:pointer; padding:4px 6px;}
+  .fp-chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .fp-chip{border:1.5px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px;
+    font-size:13px; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:5px;}
+  .fp-chip.house{border-color:var(--gold); font-weight:600;}
+  .fp-chip.fp-add{border-style:dashed; color:var(--gold); font-weight:600;}
+  .fp-chip.unsorted{border-style:dotted;}
+  .fp-count{font-size:11px; background:var(--parchment-dim); border-radius:999px; padding:1px 7px; color:var(--ink-soft);}
+  .fp-x{font-size:11px; opacity:.55; margin-left:2px;}
+  .fp-newrow{display:flex; gap:6px; margin-top:8px;}
+  .fp-newrow input{flex:1;}
+  .fp-hint{font-size:11.5px; color:var(--ink-soft); margin-top:6px;}
+  .fp-browse{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:8px 10px; margin:8px 0 10px;}
+  .fp-browse .fp-chip{padding:5px 11px;}
+  .hymn-row .path{font-size:11px; color:var(--gold); margin-top:1px;}
   /* Modal */
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(43,33,24,0.5); z-index:50; display:none;
@@ -663,6 +684,7 @@
         <button class="btn secondary" id="openBatchAdd" style="white-space:nowrap;">Batch add</button>
         <button class="btn secondary" id="toggleSelectMode" style="white-space:nowrap;">Select</button>
       </div>
+      <div id="libFolderBar"></div>
       <div id="categoryChips"></div>
       <div id="monthChips"></div>
       <div id="libraryList"></div>
@@ -676,6 +698,7 @@
       <div class="bulk-bar-actions">
         <button class="btn secondary" id="bulkFavorite">♥ Favorite</button>
         <button class="btn secondary" id="bulkQueue">+Q Queue</button>
+        <button class="btn secondary" id="bulkMove">📁 Move</button>
         <button class="btn secondary" id="bulkSetCategory">Category</button>
         <button class="btn secondary" id="bulkShare">Share</button>
         <button class="btn danger" id="bulkDelete">Delete</button>
@@ -1121,6 +1144,8 @@
       <div class="section-title" style="margin-top:2px;">Details</div>
       <label>Title</label>
       <input type="text" id="fTitle" placeholder="Hymn title">
+      <label>Folder</label>
+      <div id="fFolderPicker"></div>
       <label>Category</label>
       <div class="chip-select" id="fCategoryChips"></div>
       <input type="text" id="fCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px; margin-bottom:12px;">
@@ -1188,6 +1213,9 @@
       </div>
 
       <div class="wizard-step" id="wstep-name">
+        <label>Folder</label>
+        <div id="wFolderPicker"></div>
+        <button type="button" class="btn ghost block hidden" id="wFolderSuggest" style="width:100%; margin:-4px 0 10px; font-size:12.5px;"></button>
         <label>Title</label>
         <input type="text" id="wTitle" placeholder="Hymn title">
         <label>Category</label>
@@ -1221,6 +1249,15 @@
   </div>
 
 
+  <div class="modal-backdrop" id="moveModalBackdrop">
+    <div class="modal">
+      <button class="modal-close" id="closeMoveModal">✕</button>
+      <h2>Move <span id="moveCount"></span></h2>
+      <div id="moveFolderPicker"></div>
+      <button class="btn block" id="moveConfirmBtn" style="width:100%; margin-top:10px;">Move here</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="qrModalBackdrop">
     <div class="modal">
       <button class="modal-close" id="closeQrModal">✕</button>
@@ -1250,6 +1287,8 @@
       <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:10px;">
         Month and celebration below apply to everything added in this batch, from links or local files.
       </div>
+      <label>Folder (applies to all — you can still change it per hymn)</label>
+      <div id="batchFolderPicker"></div>
       <label>Month (optional, applies to all)</label>
       <select id="batchMonth"><option value="">— None —</option></select>
       <label>Celebration / feast (optional, applies to all)</label>
@@ -1284,6 +1323,8 @@
 
       <label>Title</label>
       <input type="text" id="batchReviewTitle" placeholder="Hymn title">
+      <label>Folder</label>
+      <div id="batchReviewFolderPicker"></div>
       <label>Category</label>
       <div class="chip-select" id="batchReviewCategoryChips"></div>
       <input type="text" id="batchReviewCategoryCustom" placeholder="Type to add a new category" style="margin-top:8px;">
@@ -1649,6 +1690,8 @@ async function saveHymnFromForm(){
     };
   }
   hymn.title = title;
+  hymn.path = editFolderPicker.get();
+  rememberFolder(hymn.path);
   hymn.category = category;
   hymn.month = month;
   hymn.celebration = celebration;
@@ -1739,6 +1782,8 @@ function openAddWizard(){
   populateMonthSelect(document.getElementById('wMonth'));
   populateCelebrationSuggestions();
   renderCategoryChipsInWizard(null);
+  wizardFolderPicker.set(defaultNewHymnPath());
+  document.getElementById('wFolderSuggest').classList.add('hidden');
   showWizardStep(0);
   document.getElementById('addWizardBackdrop').classList.add('active');
 }
@@ -1836,6 +1881,7 @@ function renderWizardReview(){
     : (document.getElementById('wAudio').files[0] ? document.getElementById('wAudio').files[0].name : 'No audio yet');
   document.getElementById('wReviewBox').innerHTML = `
     <div><b>${escapeHtml(title)}</b></div>
+    <div style="color:var(--gold); margin-top:4px;">📁 ${escapeHtml(pathLabel(wizardFolderPicker.get()))}</div>
     <div style="color:var(--ink-soft); margin-top:4px;">Category: ${escapeHtml(cat)}</div>
     <div style="color:var(--ink-soft);">Month: ${escapeHtml(month)} · Celebration: ${escapeHtml(cel)}</div>
     <div style="color:var(--ink-soft);">Audio: ${escapeHtml(audioInfo)}</div>
@@ -1865,8 +1911,10 @@ async function saveWizardHymn(){
   const audioLink = document.getElementById('wAudioLink').value.trim();
   const imageFiles = Array.from(document.getElementById('wImages').files);
 
+  const path = wizardFolderPicker.get();
+  rememberFolder(path);
   const hymn = {
-    id: uid(), title, category, month, celebration, tags, favorite:false,
+    id: uid(), title, category, month, celebration, tags, favorite:false, path,
     audioType:'file', audioId:null, audioUrl:null, offlineId:null,
     images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
     stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
@@ -1985,6 +2033,7 @@ async function openEditModal(id){
   editingHymnId = id;
   document.getElementById('modalTitle').textContent = 'Edit hymn';
   document.getElementById('fTitle').value = h.title;
+  editFolderPicker.set(h.path || []);
   modalSelectedCategory = h.category||'';
   document.getElementById('fCategoryCustom').value='';
   await renderCategoryChipsInModal(h.category||'');
@@ -2086,11 +2135,14 @@ async function ensureFileAccess(){
 /* Saves a blob via the native plugin into Music/Yared music/<month>/<celebration>[/<extraSub>]/<title>.<ext>,
    falling back to a plain browser download (best-effort path hint only)
    when the native plugin isn't available. */
-async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
+async function saveAudioToDevice(blob, {month, celebration, title, extraSub, path}){
   const ext = EXT_BY_MIME[baseMime(blob.type)] || 'mp3';
   const filename = `${sanitizeFilenamePart(title)}.${ext}`;
-  const subPath = [sanitizeFilenamePart(month||'Unsorted'), sanitizeFilenamePart(celebration||'Uncategorized'), extraSub?sanitizeFilenamePart(extraSub):null]
-    .filter(Boolean).join('/');
+  // hymns filed in a folder are saved in the same folders: Music/Yared music/ዜማ ቤት/ድጓ/…
+  const subPath = (path && path.length)
+    ? [...path.map(sanitizeFilenamePart), extraSub?sanitizeFilenamePart(extraSub):null].filter(Boolean).join('/')
+    : [sanitizeFilenamePart(month||'Unsorted'), sanitizeFilenamePart(celebration||'Uncategorized'), extraSub?sanitizeFilenamePart(extraSub):null]
+      .filter(Boolean).join('/');
 
   const plugin = getFileSaverPlugin();
   if(plugin){
@@ -2122,10 +2174,10 @@ async function saveAudioToDevice(blob, {month, celebration, title, extraSub}){
   }
 
   // Browser fallback — no real folder guarantee, see caveat in prior notes.
-  const path = `${subPath}/${filename}`;
+  const dlName = `${subPath}/${filename}`;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = path;
+  a.href = url; a.download = dlName;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=> URL.revokeObjectURL(url), 4000);
   toast('Downloading…');
@@ -2147,7 +2199,7 @@ async function downloadHymnAudio(hymnId){
     return;
   }
   if(!blob){ toast('No audio attached to this hymn'); return; }
-  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title});
+  await saveAudioToDevice(blob, {month:h.month, celebration:h.celebration, title:h.title, path:h.path});
 }
 async function downloadRecording(hymnId, recordingId){
   const h = await dbGet('hymns', hymnId);
@@ -2162,7 +2214,7 @@ async function downloadRecording(hymnId, recordingId){
     try{ out = await blobToWav(out); }catch(e){ /* keep the original if this browser can't decode it */ }
   }
   await saveAudioToDevice(out, {
-    month:h.month, celebration:h.celebration, extraSub:'Recording',
+    month:h.month, celebration:h.celebration, extraSub:'Recording', path:h.path,
     title: `${h.title} - ${rec.label}`
   });
 }
@@ -2370,13 +2422,19 @@ function renderMonthChips(){
   });
 }
 function renderLibrary(){
+  if(typeof createFolderPicker === 'function' && document.getElementById('libFolderBar')){
+    createFolderPicker(document.getElementById('libFolderBar'), {path:libFolder, unsorted:libUnsorted, browse:true,
+      onChange:(p, u)=>{ libFolder = p; libUnsorted = !!u; renderLibrary(); }});
+  }
   renderCategoryChips();
   renderMonthChips();
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   let list = hymns.filter(h=>{
+    if(libUnsorted && h.path && h.path.length) return false;
+    if(!libUnsorted && libFolder.length && !pathStartsWith(h.path, libFolder)) return false;
     if(activeCategory && h.category!==activeCategory) return false;
     if(activeMonth && h.month!==activeMonth) return false;
-    if(q && !(h.title.toLowerCase().includes(q) || (h.tags||[]).join(' ').toLowerCase().includes(q)
+    if(q && !(h.title.toLowerCase().includes(q) || (h.tags||[]).join(' ').toLowerCase().includes(q) || (h.path||[]).join(' ').toLowerCase().includes(q)
         || (h.celebration||'').toLowerCase().includes(q) || (h.month||'').toLowerCase().includes(q))) return false;
     return true;
   });
@@ -2398,6 +2456,7 @@ function renderLibrary(){
       <div class="meta">
         <div class="t"><span class="status-dot" style="background:${statusDef.color}" title="${statusDef.label}"></span>${escapeHtml(h.title)}</div>
         <div class="s">${escapeHtml(subParts.join(' · '))}</div>
+        ${(h.path && h.path.length > libFolder.length) ? `<div class="path">📁 ${escapeHtml(h.path.slice(libFolder.length).join(' › '))}</div>` : ''}
       </div>`;
     if(selectMode){
       const checked = selectedHymnIds.has(h.id);
@@ -2967,6 +3026,7 @@ document.getElementById('openBatchAdd').addEventListener('click', ()=>{
   document.getElementById('batchFilesCategoryCustom').value='';
   batchFilesCategory='';
   renderBatchFilesCategoryChips(null);
+  batchFolderPicker.set(defaultNewHymnPath());
   document.getElementById('batchModalBackdrop').classList.add('active');
 });
 document.getElementById('closeBatchModal').addEventListener('click', ()=>{
@@ -2998,10 +3058,10 @@ document.getElementById('submitBatchAdd').addEventListener('click', ()=>{
       catch(e){ title='Untitled hymn'; }
     }
     if(!url) continue;
-    queue.push({title: title||'Untitled hymn', category, month, celebration, audioType:'link', audioUrl:url, audioFile:null});
+    queue.push({title: title||'Untitled hymn', category, month, celebration, path: batchFolderPicker.get(), audioType:'link', audioUrl:url, audioFile:null});
   }
   for(const file of localFiles){
-    queue.push({title: filenameToTitle(file.name), category: filesCategory, month, celebration, audioType:'file', audioUrl:null, audioFile:file});
+    queue.push({title: filenameToTitle(file.name), category: filesCategory, month, celebration, path: batchFolderPicker.get(), audioType:'file', audioUrl:null, audioFile:file});
   }
 
   if(!queue.length){ toast('Nothing to review'); return; }
@@ -3042,6 +3102,7 @@ async function showBatchReviewItem(){
   const item = batchReviewQueue[batchReviewIndex];
   document.getElementById('batchReviewPos').textContent = (batchReviewIndex+1)+' of '+batchReviewQueue.length;
   document.getElementById('batchReviewTitle').value = item.title;
+  batchReviewFolderPicker.set(item.path || []);
   document.getElementById('batchReviewImages').value='';
   document.getElementById('batchReviewImagesNote').textContent='';
   batchReviewSelectedCategory = item.category || '';
@@ -3109,8 +3170,14 @@ document.getElementById('batchReviewAdd').addEventListener('click', async ()=>{
   const category = customCat || batchReviewSelectedCategory || '';
   if(customCat) await addCustomCategory(customCat);
 
+  const path = batchReviewFolderPicker.get();
+  rememberFolder(path);
+  // a folder changed here carries on to the remaining hymns that still had the batch folder
+  for(let j=batchReviewIndex+1; j<batchReviewQueue.length; j++){
+    if(samePath(batchReviewQueue[j].path, item.path)) batchReviewQueue[j].path = path;
+  }
   const hymn = {
-    id: uid(), title, category, month:item.month, celebration:item.celebration, tags:[], favorite:false,
+    id: uid(), title, category, month:item.month, celebration:item.celebration, path, tags:[], favorite:false,
     audioType:item.audioType, audioId:null, audioUrl:null, offlineId:null,
     images:[], sections:[], loops:[], recordings:[], duration:0, lastPosition:0,
     stats:{lastPracticed:0, practiceCount:0, intervalDays:1, dueAt:0, status:'new'},
@@ -4864,8 +4931,8 @@ async function loadDarkModePref(){
    ============================================================ */
 let sheetSync = {url:'', secret:'', auto:true, lastSyncAt:0, lastMsg:''};
 let sheetSyncRunning = false;
-const SHEET_META_FIELDS = ['title','category','month','celebration','audioLink'];
-const SHEET_SYNC_KEYS = ['title','category','month','celebration','audioType','audioUrl','offlineId','duration','sheetAudioLink','images','sheetSnap','updatedAt'];
+const SHEET_META_FIELDS = ['title','category','month','celebration','audioLink','path'];
+const SHEET_SYNC_KEYS = ['title','category','month','celebration','path','audioType','audioUrl','offlineId','duration','sheetAudioLink','images','sheetSnap','updatedAt'];
 
 async function loadSheetSyncSettings(){
   try{
@@ -4960,6 +5027,7 @@ function hymnSheetValues(h){
   return {
     title: h.title||'', category: h.category||'', month: h.month||'', celebration: h.celebration||'',
     audioLink: h.audioType==='link' ? (h.audioUrl||'') : (h.sheetAudioLink||''),
+    path: (h.path||[]).join(' / '),
     status: st.status || 'new',
     practiceCount: st.practiceCount || 0,
     length: h.duration ? fmtTime(h.duration) : '',
@@ -4971,12 +5039,14 @@ function hymnToSheetRow(h){
   const v = hymnSheetValues(h);
   return {
     id: h.id, title: v.title, category: v.category, month: v.month, celebration: v.celebration,
+    house: (h.path||[])[0] || '', folder: (h.path||[]).slice(1).join(' / '),
     audioLink: v.audioLink, status: (STATUS_DEFS[v.status]||STATUS_DEFS.new).label,
     length: v.length, practiceCount: v.practiceCount, lastPracticed: v.lastPracticed,
     lyricImageLinks: v.links, updatedAt: h.updatedAt || h.createdAt || Date.now()
   };
 }
 function sheetRowDiffers(a, b){
+  if(b.house !== undefined && (String(a.house||'') !== String(b.house||'') || String(a.folder||'') !== String(b.folder||''))) return true;
   for(const f of ['title','category','month','celebration','audioLink','length']){
     if(String(a[f]||'') !== String(b[f]||'')) return true;
   }
@@ -4993,6 +5063,7 @@ function newHymnFromSheetRow(r){
   const def = STATUS_DEFS[key];
   return {
     id: r.id, title: r.title, category: r.category||'', month: r.month||'', celebration: r.celebration||'',
+    path: r.path ? r.path.split(' / ').map(x=>x.trim()).filter(Boolean) : [],
     tags: [], favorite: false,
     audioType: r.audioLink ? 'link' : 'file', audioId: null, audioUrl: r.audioLink || null, offlineId: null,
     images: [], sections: [], loops: [], recordings: [], duration: 0, lastPosition: 0,
@@ -5002,6 +5073,7 @@ function newHymnFromSheetRow(r){
   };
 }
 function applySheetField(h, f, val){
+  if(f==='path'){ h.path = val ? val.split(' / ').map(x=>x.trim()).filter(Boolean) : []; return; }
   if(f==='audioLink'){
     if(h.audioType==='link' || !h.audioId){
       if(h.offlineId){ dbDelete('media', h.offlineId).catch(()=>{}); }
@@ -5019,6 +5091,7 @@ function applySheetRowToHymn(h, r){
   const sheetNewer = (r.updatedAt||0) > (h.updatedAt||0);
   let changed = false;
   for(const f of SHEET_META_FIELDS){
+    if(r[f] === undefined) continue; // older sheet script without this column
     const sv = String(r[f]||''), lv = String(cur[f]||'');
     if(sv === lv) continue;
     if((f==='title' || f==='audioLink') && !sv) continue; // never blank these out from the sheet
@@ -5134,7 +5207,7 @@ async function uploadMissingImages(h, counts){
       const mime = rec.blob.type || 'image/jpeg';
       const dataUrl = await blobToDataUrl(rec.blob);
       const ext = (mime.split('/')[1]||'jpg').replace('jpeg','jpg');
-      const res = await sheetApiPost({action:'uploadImage', hymnId:h.id, mime,
+      const res = await sheetApiPost({action:'uploadImage', hymnId:h.id, mime, folderPath:(h.path||[]),
         name: (h.title||'Hymn')+' - page '+(i+1)+'.'+ext, data: dataUrl.split(',')[1]});
       img.link = res.link; img.driveId = res.id;
       counts.imagesOut++;
@@ -5175,6 +5248,10 @@ async function syncWithSheet({quiet=false}={}){
     renderSheetSyncStatus('Syncing… reading the sheet');
     const pulled = await sheetApiGet({action:'pull'});
     const rows = pulled.rows || [];
+    rows.forEach(r=>{
+      if(r.house === undefined) return; // older script: no house tabs yet
+      r.path = r.house ? [r.house, ...String(r.folder||'').split('/').map(x=>x.trim()).filter(Boolean)].join(' / ') : '';
+    });
     if(pulled.spreadsheetUrl && pulled.spreadsheetUrl !== sheetSync.sheetUrl){
       sheetSync.sheetUrl = pulled.spreadsheetUrl;
       await saveSheetSyncSettings();
@@ -5238,7 +5315,7 @@ async function syncWithSheet({quiet=false}={}){
     for(const h of localById.values()){
       const v = hymnSheetValues(h);
       h.sheetSnap = {title:v.title, category:v.category, month:v.month, celebration:v.celebration,
-                     audioLink:v.audioLink, status:v.status, practiceCount:v.practiceCount, links:v.links};
+                     audioLink:v.audioLink, path:v.path, status:v.status, practiceCount:v.practiceCount, links:v.links};
       await persistSynced(h);
     }
 
@@ -6149,11 +6226,231 @@ document.getElementById('bgSize').addEventListener('change', (e)=>{ appearance.s
 document.getElementById('bgGray').addEventListener('change', (e)=>{ appearance.gray = e.target.checked; saveAppearance(); applyAppBackground(); });
 document.getElementById('celBgDetails').addEventListener('toggle', ()=>{ if(document.getElementById('celBgDetails').open) renderCelebrationBgList(); });
 
+/* ============================================================
+   FOLDERS — every hymn lives in a folder path whose first level is
+   one of the five houses, e.g. ["ዜማ ቤት","ድጓ","ጥር","11","አባ ሊባኖስ"].
+   Below the house, folders are made by the learner: "＋ New folder"
+   creates one and steps into it, so adding another nests it. The
+   same path names the Google Sheet tab (the house) + folder column,
+   the saved-file folders and the Drive lyric-image folders.
+   ============================================================ */
+const HOUSES = ['ንባብ ቤት','ዜማ ቤት','ቅዳሴ ቤት','አቋቋም ቤት','ትርጓሜ ቤት'];
+let extraFolders = [];       // folders created before any hymn was put in them
+let lastFolderPath = [];     // where the previous hymn was saved — the default for the next one
+let libFolder = [];          // Library: folder being browsed ([] = everything)
+let libUnsorted = false;     // Library: showing hymns that have no folder yet
+
+async function loadFolders(){
+  try{
+    const r = await dbGet('meta','folders'); extraFolders = (r && r.value) || [];
+    const l = await dbGet('meta','lastFolderPath'); lastFolderPath = (l && l.value) || [];
+  }catch(e){}
+}
+function saveFolders(){ dbPut('meta', {key:'folders', value:extraFolders}).catch(()=>{}); }
+function rememberFolder(path){ lastFolderPath = (path||[]).slice(); dbPut('meta', {key:'lastFolderPath', value:lastFolderPath}).catch(()=>{}); }
+function cleanFolderName(n){ return String(n||'').replace(/[\/\\›|]/g,'-').replace(/\s+/g,' ').trim().slice(0,80); }
+function pathStartsWith(p, prefix){ p = p || []; return prefix.every((x,i)=>p[i]===x); }
+function samePath(a, b){ a = a||[]; b = b||[]; return a.length===b.length && a.every((x,i)=>x===b[i]); }
+function pathLabel(p){ return (p && p.length) ? p.join(' › ') : 'Unsorted'; }
+function addFolderPath(path){
+  for(let i=1;i<=path.length;i++){
+    const sub = path.slice(0,i);
+    if(i>1 && !extraFolders.some(f=>samePath(f,sub))) extraFolders.push(sub);
+  }
+  saveFolders();
+}
+function folderChildren(path){
+  const counts = new Map();
+  const add = (p, n)=>{ if(p && p.length > path.length && pathStartsWith(p, path)){ const c = p[path.length]; counts.set(c, (counts.get(c)||0) + n); } };
+  hymns.forEach(h=>add(h.path, 1));
+  extraFolders.forEach(p=>add(p, 0));
+  let names;
+  if(!path.length){
+    HOUSES.forEach(x=>{ if(!counts.has(x)) counts.set(x, 0); });
+    names = HOUSES.concat([...counts.keys()].filter(x=>!HOUSES.includes(x)));
+  } else {
+    names = [...counts.keys()].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+  }
+  return names.map(n=>({name:n, count:counts.get(n)||0}));
+}
+
+/* A reusable picker: breadcrumbs to go back up, chips to step into a folder,
+   "＋ New folder" to make (and step into) a new one. */
+function createFolderPicker(el, opts){
+  opts = opts || {};
+  let path = (opts.path || []).slice();
+  let unsorted = !!opts.unsorted;
+  const api = {
+    get: ()=>path.slice(),
+    set: (p, u)=>{ path = (p||[]).slice(); unsorted = !!u; render(); },
+    render: ()=>render()
+  };
+  function changed(){ if(opts.onChange) opts.onChange(path.slice(), unsorted); render(); }
+  function render(){
+    const kids = unsorted ? [] : folderChildren(path);
+    const unsortedCount = opts.browse ? hymns.filter(h=>!(h.path && h.path.length)).length : 0;
+    const crumbs = [`<button class="fp-crumb ${!path.length && !unsorted ? 'on' : ''}" data-i="0">${opts.browse ? '📚 All' : '📁 Top'}</button>`];
+    if(unsorted) crumbs.push(`<span class="fp-sep">›</span><button class="fp-crumb on" data-i="0" data-u="1">📥 Unsorted</button>`);
+    path.forEach((n,i)=>crumbs.push(`<span class="fp-sep">›</span><button class="fp-crumb ${i===path.length-1?'on':''}" data-i="${i+1}">${escapeHtml(n)}</button>`));
+    if(path.length > 1) crumbs.push(`<button class="fp-edit" title="Rename this folder">✎</button>`);
+    const chips = [];
+    if(opts.browse && !path.length && !unsorted && unsortedCount) chips.push(`<button class="fp-chip unsorted" data-unsorted="1">📥 Unsorted <span class="fp-count">${unsortedCount}</span></button>`);
+    kids.forEach(c=>{
+      const house = !path.length && HOUSES.includes(c.name);
+      chips.push(`<button class="fp-chip ${house?'house':''}" data-n="${escapeHtml(c.name)}">${house?'🏛':'📁'} ${escapeHtml(c.name)}${c.count?` <span class="fp-count">${c.count}</span>`:''}${(!house && !c.count)?'<span class="fp-x" data-del="1" title="Remove empty folder">✕</span>':''}</button>`);
+    });
+    if(path.length && !unsorted) chips.push(`<button class="fp-chip fp-add">＋ New folder</button>`);
+    const hint = opts.browse ? '' : (!path.length
+      ? '<div class="fp-hint">Pick a house (or leave it here to keep the hymn in Unsorted).</div>'
+      : `<div class="fp-hint">Saving in <b>${escapeHtml(pathLabel(path))}</b> — tap a folder to go deeper, or ＋ to make one.</div>`);
+    el.innerHTML = `<div class="fp${opts.browse?' fp-browse':''}">
+      <div class="fp-crumbs">${crumbs.join('')}</div>
+      <div class="fp-chips">${chips.join('')}</div>
+      <div class="fp-newrow hidden"><input type="text" placeholder="Folder name — e.g. ድጓ, ጥር, 11, አባ ሊባኖስ"><button class="btn" type="button">Add</button></div>
+      ${hint}</div>`;
+    el.querySelectorAll('.fp-crumb').forEach(b=>b.addEventListener('click', ()=>{
+      if(b.dataset.u) return;
+      path = path.slice(0, +b.dataset.i); unsorted = false; changed();
+    }));
+    el.querySelectorAll('.fp-chip[data-n]').forEach(b=>b.addEventListener('click', (e)=>{
+      const name = b.dataset.n;
+      if(e.target.dataset.del){
+        extraFolders = extraFolders.filter(f=>!pathStartsWith(f, [...path, name]));
+        saveFolders(); render(); return;
+      }
+      path.push(name); changed();
+    }));
+    const un = el.querySelector('[data-unsorted]');
+    if(un) un.addEventListener('click', ()=>{ unsorted = true; path = []; changed(); });
+    const addBtn = el.querySelector('.fp-add'), row = el.querySelector('.fp-newrow');
+    if(addBtn){
+      const input = row.querySelector('input');
+      const commit = ()=>{
+        const name = cleanFolderName(input.value);
+        if(!name){ row.classList.add('hidden'); return; }
+        const np = [...path, name];
+        if(!extraFolders.some(f=>samePath(f, np))){ extraFolders.push(np); saveFolders(); }
+        path = np; changed();
+      };
+      addBtn.addEventListener('click', ()=>{ row.classList.remove('hidden'); input.focus(); });
+      row.querySelector('button').addEventListener('click', commit);
+      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); } });
+    }
+    const edit = el.querySelector('.fp-edit');
+    if(edit) edit.addEventListener('click', async ()=>{
+      const old = path[path.length-1];
+      const name = cleanFolderName(prompt('Rename folder “'+old+'” to:', old) || '');
+      if(!name || name === old) return;
+      await renameFolder(path.slice(), name);
+      path[path.length-1] = name; changed();
+    });
+  }
+  render();
+  return api;
+}
+async function renameFolder(path, newName){
+  const depth = path.length - 1;
+  for(const h of hymns){
+    if(pathStartsWith(h.path, path)){
+      const fresh = await dbGet('hymns', h.id);
+      if(!fresh) continue;
+      fresh.path = fresh.path.slice(); fresh.path[depth] = newName;
+      fresh.updatedAt = Date.now();
+      await dbPut('hymns', fresh);
+    }
+  }
+  extraFolders = extraFolders.map(f=> pathStartsWith(f, path) ? f.map((x,i)=> i===depth ? newName : x) : f);
+  if(pathStartsWith(lastFolderPath, path)){ const l = lastFolderPath.slice(); l[depth] = newName; rememberFolder(l); }
+  if(pathStartsWith(libFolder, path)) libFolder[depth] = newName;
+  saveFolders();
+  await loadHymns();
+  renderLibrary();
+  toast('Folder renamed');
+}
+
+/* Guesses a folder path from a link like
+   …/zema timehert bet/mahlet yared/3 aquaquam …/29. ame 3 letir aba libanos/3. aququam wetsenatsil/24.mp3 */
+const HOUSE_KEYWORDS = [
+  ['ንባብ ቤት', /(^|[^a-z])(nbab|nebab|nibab|niba+b|nbabe)/i],
+  ['ቅዳሴ ቤት', /(kidase|qidase|kdase|qdase|kiddase|qiddase|kidassie)/i],
+  ['ትርጓሜ ቤት', /(tirguame|trguame|tergume|targume|tirgume|tirguamie|trgume)/i],
+  ['አቋቋም ቤት', /(aquaquam|akuakuam|aqwaqwam|aquakuam|aququam|akwakwam|aquaqwam)/i],
+  ['ዜማ ቤት', /(^|[^a-z])(zema|zēma|zemma)/i]
+];
+function suggestPathFromUrl(url){
+  let segs;
+  try{ segs = new URL(url).pathname.split('/').map(s=>{ try{ return decodeURIComponent(s); }catch(e){ return s; } }); }
+  catch(e){ return null; }
+  segs = segs.map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+  segs.pop(); // the file itself
+  segs = segs.filter(s=>!/^(churchmusic|music|audio|audios|files?|uploads?|media|mp3s?|wp-content|sites?|default|public|download|downloads)$/i.test(s));
+  for(let i=0;i<segs.length;i++){
+    const direct = HOUSES.find(h=>segs[i].includes(h.replace(' ቤት','')));
+    const kw = direct || (HOUSE_KEYWORDS.find(([,re])=>re.test(segs[i])) || [])[0];
+    if(kw) return [kw, ...segs.slice(i+1).map(cleanFolderName).filter(Boolean)].slice(0, 10);
+  }
+  return null;
+}
+
+/* ---------- "Move to…" for selected hymns ---------- */
+let movePicker = null;
+function openMoveModal(){
+  if(!selectedHymnIds.size) return;
+  document.getElementById('moveCount').textContent = selectedHymnIds.size + ' hymn' + (selectedHymnIds.size===1?'':'s');
+  const first = hymns.find(h=>selectedHymnIds.has(h.id));
+  movePicker = createFolderPicker(document.getElementById('moveFolderPicker'), {path: (first && first.path) || lastFolderPath});
+  document.getElementById('moveModalBackdrop').classList.add('active');
+}
+document.getElementById('bulkMove').addEventListener('click', openMoveModal);
+document.getElementById('closeMoveModal').addEventListener('click', ()=>document.getElementById('moveModalBackdrop').classList.remove('active'));
+document.getElementById('moveConfirmBtn').addEventListener('click', async ()=>{
+  const path = movePicker.get();
+  for(const id of selectedHymnIds){
+    const h = await dbGet('hymns', id);
+    if(h){ h.path = path; h.updatedAt = Date.now(); await dbPut('hymns', h); }
+  }
+  rememberFolder(path);
+  document.getElementById('moveModalBackdrop').classList.remove('active');
+  selectMode = false; selectedHymnIds.clear();
+  document.getElementById('toggleSelectMode').classList.remove('on');
+  await loadHymns();
+  updateBulkBar(); renderLibrary(); renderHome();
+  toast('Moved to ' + pathLabel(path));
+});
+
+/* ---------- pickers in Add / Edit / Batch ---------- */
+const wizardFolderPicker = createFolderPicker(document.getElementById('wFolderPicker'), {path:[]});
+const editFolderPicker = createFolderPicker(document.getElementById('fFolderPicker'), {path:[]});
+const batchFolderPicker = createFolderPicker(document.getElementById('batchFolderPicker'), {path:[]});
+const batchReviewFolderPicker = createFolderPicker(document.getElementById('batchReviewFolderPicker'), {path:[]});
+let wizardSuggestedPath = null;
+function defaultNewHymnPath(){
+  const onLibrary = document.getElementById('screen-library').classList.contains('active');
+  return (onLibrary && libFolder.length) ? libFolder.slice() : lastFolderPath.slice();
+}
+function updateWizardFolderSuggestion(){
+  const btn = document.getElementById('wFolderSuggest');
+  const link = document.getElementById('wAudioLink').value.trim();
+  wizardSuggestedPath = (wizardAudioSourceMode==='link' && link) ? suggestPathFromUrl(link) : null;
+  if(wizardSuggestedPath && !samePath(wizardSuggestedPath, wizardFolderPicker.get())){
+    btn.textContent = '📎 Use folders from the link: ' + pathLabel(wizardSuggestedPath);
+    btn.classList.remove('hidden');
+  } else btn.classList.add('hidden');
+}
+document.getElementById('wAudioLink').addEventListener('input', updateWizardFolderSuggestion);
+document.getElementById('wFolderSuggest').addEventListener('click', ()=>{
+  if(!wizardSuggestedPath) return;
+  addFolderPath(wizardSuggestedPath);
+  wizardFolderPicker.set(wizardSuggestedPath);
+  document.getElementById('wFolderSuggest').classList.add('hidden');
+});
+
 async function init(){
   await openDB();
   await loadDarkModePref();
   await loadAppearance();
   await loadHymns();
+  await loadFolders();
   renderHome();
   renderLibrary();
   setupNativeNotificationBridge();

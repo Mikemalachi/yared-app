@@ -11,16 +11,20 @@
  * the row; a missing row is simply re-added from the phone on the next sync).
  */
 
-const SHEET_NAME = 'Hymns';
+const HOUSES = ['ንባብ ቤት','ዜማ ቤት','ቅዳሴ ቤት','አቋቋም ቤት','ትርጓሜ ቤት'];
+const UNSORTED = 'Unsorted';
+const LEGACY_SHEET = 'Hymns';           // single tab used before the houses existed — renamed to Unsorted
 const CEL_SHEET_NAME = 'Celebrations';
 const CEL_HEADERS = ['celebration','imageLink','preview','updatedAt'];
 const FOLDER_NAME = 'Yared Hymn Tracker Lyrics';
-const HEADERS = ['id','title','category','month','celebration','audioLink','status',
+const HEADERS = ['id','title','folder','category','month','celebration','audioLink','status',
                  'length','practiceCount','lastPracticed','lyricImageLinks','lyricPreview',
                  'updatedAt','deleted'];
 const STATUS_LABELS = ['New','Needs Practice','Learning','Well Memorized'];
+const MONTHS = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miazia','Ginbot','Sene','Hamle','Nehase','Pagume'];
 // Columns the script maintains itself — editing them does not count as a sheet edit.
 const SYSTEM_COLS = ['id','lyricPreview','updatedAt','length','lastPracticed'];
+const TEXT_COLS = ['id','title','folder','category','celebration','length','audioLink'];
 
 /* ---------------- menu & setup ---------------- */
 
@@ -33,45 +37,53 @@ function onOpen(){
 }
 
 function setup(){
-  const sheet = getSheet_();
-  // make "Hymns" the first tab and drop the empty default "Sheet1", so it's the tab you see
   const ss = SpreadsheetApp.getActive();
-  ss.setActiveSheet(sheet);
-  ss.moveActiveSheet(1);
+  // one tab per house, then Unsorted, then Celebrations — in that order
+  const order = HOUSES.concat([UNSORTED]);
+  order.forEach((name, i) => {
+    const sh = getTab_(name);
+    formatHymnTab_(sh);
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(i + 1);
+  });
+  const cel = getCelSheet_();
+  ss.setActiveSheet(cel); ss.moveActiveSheet(order.length + 1);
+  // drop an empty default "Sheet1"
   ss.getSheets().forEach(sh => {
-    if(sh.getSheetId() !== sheet.getSheetId() && /^(Sheet|Feuille|Hoja|Tabelle)\s?1$/i.test(sh.getName()) && sh.getLastRow() === 0 && sh.getLastColumn() === 0){
+    if(/^(Sheet|Feuille|Hoja|Tabelle)\s?1$/i.test(sh.getName()) && sh.getLastRow() === 0 && sh.getLastColumn() === 0){
       try{ ss.deleteSheet(sh); }catch(e){}
     }
   });
+  // tidy every tab: rows packed from row 2 and sorted by folder, then title
+  const tabs = loadTabs_(true);
+  Object.keys(tabs).forEach(n => writeTab_(tabs[n]));
+  ss.setActiveSheet(getTab_(HOUSES[0]));
+  getFolder_();
+  getSecret_();
+  refreshPreviews();
+  showInfo();
+}
+
+function formatHymnTab_(sheet){
   const map = headerMap_(sheet);
   sheet.setFrozenRows(1);
-  const hdr = sheet.getRange(1, 1, 1, sheet.getLastColumn());
-  hdr.setFontWeight('bold').setBackground('#2b2118').setFontColor('#f3e9d2');
+  sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight('bold').setBackground('#2b2118').setFontColor('#f3e9d2');
   const maxRows = sheet.getMaxRows();
   if(maxRows > 1){
     sheet.getRange(2, map.status + 1, maxRows - 1, 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(STATUS_LABELS, true).setAllowInvalid(true).build());
     sheet.getRange(2, map.month + 1, maxRows - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(
-        ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miazia','Ginbot','Sene','Hamle','Nehase','Pagume'], true)
-        .setAllowInvalid(true).build());
+      SpreadsheetApp.newDataValidation().requireValueInList(MONTHS, true).setAllowInvalid(true).build());
     sheet.getRange(2, map.updatedAt + 1, maxRows - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     sheet.getRange(2, map.lastPracticed + 1, maxRows - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     sheet.getRange(2, map.lyricImageLinks + 1, maxRows - 1, 1).setWrap(true);
-    ['id','title','category','celebration','length','audioLink'].forEach(f =>
-      sheet.getRange(2, map[f] + 1, maxRows - 1, 1).setNumberFormat('@'));
+    TEXT_COLS.forEach(f => sheet.getRange(2, map[f] + 1, maxRows - 1, 1).setNumberFormat('@'));
   }
   sheet.setColumnWidth(map.id + 1, 90);
   sheet.setColumnWidth(map.title + 1, 220);
+  sheet.setColumnWidth(map.folder + 1, 240);
   sheet.setColumnWidth(map.lyricPreview + 1, 160);
   sheet.setColumnWidth(map.lyricImageLinks + 1, 240);
-  compact_(sheet, map);
-  getCelSheet_();
-  ss.setActiveSheet(sheet);
-  getFolder_();
-  getSecret_();
-  refreshPreviews();
-  showInfo();
 }
 
 function showInfo(){
@@ -111,13 +123,14 @@ function saveWebAppUrl(url){
     PropertiesService.getScriptProperties().setProperty('WEB_APP_URL', String(url));
 }
 
+
 /* ---------------- simple trigger: stamp manual edits ---------------- */
 
 function onEdit(e){
   try{
     const sheet = e.range.getSheet();
     if(sheet.getName() === CEL_SHEET_NAME){ celOnEdit_(sheet, e.range); return; }
-    if(sheet.getName() !== SHEET_NAME) return;
+    if(!isHymnTab_(sheet.getName())) return;
     const r0 = e.range.getRow(), nRows = e.range.getNumRows();
     if(r0 + nRows - 1 < 2) return;
     const map = headerMap_(sheet);
@@ -130,8 +143,7 @@ function onEdit(e){
     if(!meaningful) return;
     const start = Math.max(2, r0), end = r0 + nRows - 1;
     const width = sheet.getLastColumn();
-    const range = sheet.getRange(start, 1, end - start + 1, width);
-    const vals = range.getValues();
+    const vals = sheet.getRange(start, 1, end - start + 1, width).getValues();
     const now = new Date();
     for(let i = 0; i < vals.length; i++){
       const row = vals[i];
@@ -152,7 +164,9 @@ function doGet(e){
   try{
     if(p.action === 'ping'){
       const ss = SpreadsheetApp.getActive();
-      return json_({ok:true, spreadsheet:ss.getName(), tab:SHEET_NAME, url:ss.getUrl() + '#gid=' + getSheet_().getSheetId(), hymnRows:Math.max(0, getSheet_().getLastRow() - 1)});
+      let n = 0;
+      existingHymnTabs_().forEach(sh => { n += Math.max(0, sh.getLastRow() - 1); });
+      return json_({ok:true, spreadsheet:ss.getName(), tabs:HOUSES.concat([UNSORTED]), url:ss.getUrl() + '#gid=' + getTab_(HOUSES[0]).getSheetId(), hymnRows:n});
     }
     if(p.action === 'pull') return json_(pull_());
     if(p.action === 'image') return json_(image_(p.id, p.url));
@@ -180,118 +194,210 @@ function doPost(e){
   }
 }
 
-/* ---------------- actions ---------------- */
+/* ---------------- hymn tabs (one per house + Unsorted) ---------------- */
 
-function pull_(){
-  const sheet = getSheet_();
-  const map = headerMap_(sheet);
-  const last = sheet.getLastRow();
-  const rows = [];
-  const spreadsheetUrl = SpreadsheetApp.getActive().getUrl() + '#gid=' + sheet.getSheetId();
-  if(last < 2) return {ok:true, rows, spreadsheetUrl, celebrations:pullCel_()};
-  const range = sheet.getRange(2, 1, last - 1, sheet.getLastColumn());
-  const vals = range.getValues();
-  const now = new Date();
-  for(let i = 0; i < vals.length; i++){
-    const v = vals[i];
-    const title = String(v[map.title] || '').trim();
-    if(!title) continue;
-    let id = String(v[map.id] || '').trim();
-    if(!id){ // row typed or pasted without the edit trigger firing
-      id = newId_();
-      sheet.getRange(i + 2, map.id + 1).setValue(id);
-      sheet.getRange(i + 2, map.updatedAt + 1).setValue(now);
-      v[map.updatedAt] = now;
-      setPreview_(sheet, map, i + 2, String(v[map.lyricImageLinks] || ''));
-    }
-    rows.push({
-      id: id,
-      title: title,
-      category: str_(v[map.category]),
-      month: str_(v[map.month]),
-      celebration: str_(v[map.celebration]),
-      audioLink: str_(v[map.audioLink]),
-      status: str_(v[map.status]),
-      practiceCount: Number(v[map.practiceCount]) || 0,
-      length: str_(v[map.length]),
-      lastPracticed: toMs_(v[map.lastPracticed]),
-      lyricImageLinks: splitLinks_(v[map.lyricImageLinks]),
-      updatedAt: toMs_(v[map.updatedAt]),
-      deleted: v[map.deleted] === true || String(v[map.deleted]).toUpperCase() === 'TRUE'
-    });
+function isHymnTab_(name){ return HOUSES.indexOf(name) > -1 || name === UNSORTED || name === LEGACY_SHEET; }
+function houseOfTab_(name){ return HOUSES.indexOf(name) > -1 ? name : ''; }
+function tabForHouse_(house){ return HOUSES.indexOf(house) > -1 ? house : UNSORTED; }
+
+// Returns the tab, creating it (with headers) if needed; adds any missing columns at the end.
+function getTab_(name){
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(name);
+  if(!sh && name === UNSORTED){
+    const legacy = ss.getSheetByName(LEGACY_SHEET);
+    if(legacy){ legacy.setName(UNSORTED); sh = legacy; }
   }
-  return {ok:true, rows, spreadsheetUrl, celebrations:pullCel_()};
+  if(!sh) sh = ss.insertSheet(name);
+  const lastCol = Math.max(sh.getLastColumn(), 1);
+  const existing = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+  if(existing.every(x => !x)){
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold').setBackground('#2b2118').setFontColor('#f3e9d2');
+    sh.setFrozenRows(1);
+  } else {
+    const missing = HEADERS.filter(h => existing.indexOf(h) === -1);
+    if(missing.length) sh.getRange(1, existing.length + 1, 1, missing.length).setValues([missing]);
+  }
+  return sh;
+}
+function existingHymnTabs_(){
+  const ss = SpreadsheetApp.getActive();
+  return HOUSES.concat([UNSORTED, LEGACY_SHEET]).map(n => ss.getSheetByName(n)).filter(Boolean);
 }
 
-function upsert_(rows){
-  const sheet = getSheet_();
-  const map = headerMap_(sheet);
-  const width = sheet.getLastColumn();
-  const last = sheet.getLastRow();
-  let data = [], formulas = [];
-  if(last >= 2){
-    const range = sheet.getRange(2, 1, last - 1, width);
-    data = range.getValues();
-    formulas = range.getFormulas();
-    for(let r = 0; r < data.length; r++)
-      for(let c = 0; c < width; c++)
-        if(formulas[r][c]) data[r][c] = formulas[r][c];
-  }
-  // keep only real hymn rows (an empty row with just an unticked box is not a hymn),
-  // so everything is packed from row 2 down with no gaps
-  const oldLen = data.length;
-  data = data.filter(row => isHymnRow_(row, map));
-  const index = {};
-  data.forEach((row, i) => { if(row[map.id]) index[String(row[map.id])] = i; });
-  let added = 0, updated = 0;
-  const fields = ['title','category','month','celebration','audioLink','status','length','practiceCount'];
-  rows.forEach(r => {
-    if(!r || !r.id) return;
-    let i = index[r.id];
-    if(i === undefined){
-      const blank = new Array(width).fill('');
-      blank[map.id] = r.id;
-      blank[map.deleted] = false;
-      data.push(blank);
-      i = data.length - 1;
-      index[r.id] = i;
-      added++;
-    } else updated++;
-    const row = data[i];
-    fields.forEach(f => { if(r[f] !== undefined) row[map[f]] = r[f]; });
-    if(r.lastPracticed !== undefined) row[map.lastPracticed] = r.lastPracticed ? new Date(r.lastPracticed) : '';
-    if(r.lyricImageLinks !== undefined){
-      const links = r.lyricImageLinks || [];
-      row[map.lyricImageLinks] = links.join('\n');
-      row[map.lyricPreview] = previewFormula_(links[0]);
+// Reads every hymn tab into {name: {sheet, headers, rows:[{header:value}], oldLen}}.
+function loadTabs_(createAll){
+  const out = {};
+  const sheets = createAll ? HOUSES.concat([UNSORTED]).map(getTab_) : existingHymnTabs_().map(sh => getTab_(sh.getName()));
+  sheets.forEach(sh => {
+    const name = sh.getName();
+    if(out[name]) return;
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim());
+    const last = sh.getLastRow();
+    const rows = [];
+    if(last >= 2){
+      const vals = sh.getRange(2, 1, last - 1, headers.length).getValues();
+      vals.forEach(v => {
+        const o = {};
+        headers.forEach((h, i) => { if(h) o[h] = v[i]; });
+        if(String(o.id || '').trim() || String(o.title || '').trim()) rows.push(o);
+      });
     }
-    row[map.updatedAt] = r.updatedAt ? new Date(r.updatedAt) : new Date();
+    out[name] = {sheet:sh, headers, rows, oldLen:Math.max(0, last - 1), dirty:false};
   });
-  if(oldLen > data.length){
-    const leftover = sheet.getRange(2 + data.length, 1, oldLen - data.length, width);
+  return out;
+}
+
+function folderSortKey_(o){ return String(o.folder || '') + '\u0000' + String(o.title || ''); }
+
+// Writes one tab back: rows packed from row 2, sorted by folder then title, leftovers cleared.
+function writeTab_(tab){
+  const sh = tab.sheet, headers = tab.headers;
+  tab.rows.sort((a, b) => folderSortKey_(a).localeCompare(folderSortKey_(b), undefined, {numeric:true, sensitivity:'base'}));
+  const n = tab.rows.length;
+  if(tab.oldLen > n){
+    const leftover = sh.getRange(2 + n, 1, tab.oldLen - n, headers.length);
     leftover.removeCheckboxes();
     leftover.clearContent();
   }
-  if(data.length){
-    // keep text columns as plain text so "3:25" or "1/2" isn't turned into a time/date
-    ['id','title','category','celebration','length','audioLink'].forEach(f => {
-      if(map[f] !== undefined) sheet.getRange(2, map[f] + 1, data.length, 1).setNumberFormat('@');
-    });
-    sheet.getRange(2, 1, data.length, width).setValues(data);
-    if(map.deleted !== undefined) sheet.getRange(2, map.deleted + 1, data.length, 1).insertCheckboxes();
-    sheet.getRange(2, map.lyricImageLinks + 1, data.length, 1).setWrap(true);
-    for(let r = 0; r < data.length; r++){
-      if(data[r][map.lyricPreview] && sheet.getRowHeight(r + 2) < 90) sheet.setRowHeight(r + 2, 110);
-    }
-  }
-  return {ok:true, added, updated};
+  if(!n) return;
+  const map = {}; headers.forEach((h, i) => { if(h && map[h] === undefined) map[h] = i; });
+  TEXT_COLS.forEach(f => { if(map[f] !== undefined) sh.getRange(2, map[f] + 1, n, 1).setNumberFormat('@'); });
+  const vals = tab.rows.map(o => headers.map(h => {
+    if(h === 'lyricPreview') return previewFormula_(splitLinks_(o.lyricImageLinks)[0]) || '';
+    if(h === 'deleted') return o.deleted === true || String(o.deleted).toUpperCase() === 'TRUE';
+    const v = o[h];
+    return v === undefined || v === null ? '' : v;
+  }));
+  sh.getRange(2, 1, n, headers.length).setValues(vals);
+  if(map.deleted !== undefined) sh.getRange(2, map.deleted + 1, n, 1).insertCheckboxes();
+  if(map.updatedAt !== undefined) sh.getRange(2, map.updatedAt + 1, n, 1).setNumberFormat('yyyy-mm-dd hh:mm');
+  if(map.lastPracticed !== undefined) sh.getRange(2, map.lastPracticed + 1, n, 1).setNumberFormat('yyyy-mm-dd hh:mm');
+  if(map.lyricImageLinks !== undefined) sh.getRange(2, map.lyricImageLinks + 1, n, 1).setWrap(true);
+  tab.rows.forEach((o, i) => { if(splitLinks_(o.lyricImageLinks)[0] && sh.getRowHeight(i + 2) < 90) sh.setRowHeight(i + 2, 110); });
+  // rows marked deleted are shown greyed out (one call for the whole block)
+  sh.getRange(2, 1, n, headers.length).setFontColors(tab.rows.map(o => {
+    const del = o.deleted === true || String(o.deleted).toUpperCase() === 'TRUE';
+    return headers.map(() => del ? '#aaaaaa' : null);
+  }));
 }
 
+/* ---------------- actions ---------------- */
+
+function pull_(){
+  const tabs = loadTabs_(false);
+  const rows = [];
+  const now = new Date();
+  Object.keys(tabs).forEach(name => {
+    const tab = tabs[name];
+    tab.rows.forEach(o => {
+      const title = str_(o.title);
+      if(!title) return;
+      if(!str_(o.id)){ o.id = newId_(); o.updatedAt = now; tab.dirty = true; } // typed or pasted without the edit trigger
+      rows.push({
+        id: str_(o.id),
+        title: title,
+        house: houseOfTab_(name),
+        folder: str_(o.folder),
+        category: str_(o.category),
+        month: str_(o.month),
+        celebration: str_(o.celebration),
+        audioLink: str_(o.audioLink),
+        status: str_(o.status),
+        practiceCount: Number(o.practiceCount) || 0,
+        length: str_(o.length),
+        lastPracticed: toMs_(o.lastPracticed),
+        lyricImageLinks: splitLinks_(o.lyricImageLinks),
+        updatedAt: toMs_(o.updatedAt),
+        deleted: o.deleted === true || String(o.deleted).toUpperCase() === 'TRUE'
+      });
+    });
+    if(tab.dirty) writeTab_(tab);
+  });
+  const first = SpreadsheetApp.getActive().getSheetByName(HOUSES[0]) || existingHymnTabs_()[0];
+  const spreadsheetUrl = SpreadsheetApp.getActive().getUrl() + (first ? '#gid=' + first.getSheetId() : '');
+  return {ok:true, rows, spreadsheetUrl, celebrations:pullCel_()};
+}
+
+// Rows carry house + folder; a hymn whose house changed moves to that house's tab.
+function upsert_(rows){
+  const tabs = loadTabs_(false);
+  const where = {};
+  Object.keys(tabs).forEach(name => tabs[name].rows.forEach((o, i) => { if(str_(o.id)) where[str_(o.id)] = {name, o}; }));
+  let added = 0, updated = 0, moved = 0;
+  const fields = ['title','folder','category','month','celebration','audioLink','status','length','practiceCount'];
+  rows.forEach(r => {
+    if(!r || !r.id) return;
+    const target = tabForHouse_(r.house);
+    if(!tabs[target]){
+      const sh = getTab_(target); formatHymnTab_(sh);
+      tabs[target] = {sheet:sh, headers:sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(x => String(x).trim()), rows:[], oldLen:0};
+    }
+    let hit = where[r.id], o;
+    if(hit){
+      o = hit.o; updated++;
+      if(hit.name !== target){
+        tabs[hit.name].rows = tabs[hit.name].rows.filter(x => x !== o);
+        tabs[hit.name].dirty = true;
+        tabs[target].rows.push(o);
+        where[r.id] = {name:target, o};
+        moved++;
+      }
+    } else {
+      o = {id:r.id, deleted:false};
+      tabs[target].rows.push(o);
+      where[r.id] = {name:target, o};
+      added++;
+    }
+    fields.forEach(f => { if(r[f] !== undefined) o[f] = r[f]; });
+    if(r.lastPracticed !== undefined) o.lastPracticed = r.lastPracticed ? new Date(r.lastPracticed) : '';
+    if(r.lyricImageLinks !== undefined) o.lyricImageLinks = (r.lyricImageLinks || []).join('\n');
+    o.updatedAt = r.updatedAt ? new Date(r.updatedAt) : new Date();
+    tabs[target].dirty = true;
+  });
+  Object.keys(tabs).forEach(n => { if(tabs[n].dirty) writeTab_(tabs[n]); });
+  return {ok:true, added, updated, moved};
+}
+
+function markDeleted_(ids){
+  if(!ids.length) return {ok:true, deleted:0};
+  const want = {}; ids.forEach(x => want[x] = true);
+  const tabs = loadTabs_(false);
+  let n = 0;
+  const now = new Date();
+  Object.keys(tabs).forEach(name => {
+    tabs[name].rows.forEach(o => {
+      if(want[str_(o.id)]){ o.deleted = true; o.updatedAt = now; tabs[name].dirty = true; n++; }
+    });
+    if(tabs[name].dirty) writeTab_(tabs[name]);
+  });
+  return {ok:true, deleted:n};
+}
+
+function refreshPreviews(){
+  existingHymnTabs_().forEach(sheet => {
+    const map = headerMap_(sheet);
+    const last = sheet.getLastRow();
+    if(last < 2 || map.lyricImageLinks === undefined) return;
+    const vals = sheet.getRange(2, map.lyricImageLinks + 1, last - 1, 1).getValues();
+    vals.forEach((v, i) => setPreview_(sheet, map, i + 2, String(v[0] || '')));
+  });
+}
+
+// Lyric images go into Drive folders that mirror the hymn's house/folder path.
 function uploadImage_(b){
   if(!b.data) return {ok:false, error:'No image data'};
   const bytes = Utilities.base64Decode(b.data);
   const blob = Utilities.newBlob(bytes, b.mime || 'image/jpeg', b.name || ('lyric-' + Date.now() + '.jpg'));
-  const file = getFolder_().createFile(blob);
+  let folder = getFolder_();
+  (Array.isArray(b.folderPath) ? b.folderPath : []).slice(0, 12).forEach(part => {
+    const name = String(part || '').replace(/[\/\\]/g, '-').trim();
+    if(!name) return;
+    const it = folder.getFoldersByName(name);
+    folder = it.hasNext() ? it.next() : folder.createFolder(name);
+  });
+  const file = folder.createFile(blob);
   try{ file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); }catch(e){ /* org policy may forbid; links still work for you */ }
   return {ok:true, id:file.getId(), link:'https://drive.google.com/file/d/' + file.getId() + '/view'};
 }
@@ -332,34 +438,6 @@ function audio_(url){
   return {ok:true, mime:type || 'audio/mpeg', data:Utilities.base64Encode(bytes)};
 }
 
-function markDeleted_(ids){
-  const sheet = getSheet_();
-  const map = headerMap_(sheet);
-  const last = sheet.getLastRow();
-  if(last < 2 || !ids.length) return {ok:true, deleted:0};
-  const idVals = sheet.getRange(2, map.id + 1, last - 1, 1).getValues();
-  const want = {}; ids.forEach(x => want[x] = true);
-  let n = 0;
-  const now = new Date();
-  idVals.forEach((v, i) => {
-    if(want[String(v[0])]){
-      sheet.getRange(i + 2, map.deleted + 1).setValue(true);
-      sheet.getRange(i + 2, map.updatedAt + 1).setValue(now);
-      sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setFontColor('#aaaaaa');
-      n++;
-    }
-  });
-  return {ok:true, deleted:n};
-}
-
-function refreshPreviews(){
-  const sheet = getSheet_();
-  const map = headerMap_(sheet);
-  const last = sheet.getLastRow();
-  if(last < 2) return;
-  const vals = sheet.getRange(2, map.lyricImageLinks + 1, last - 1, 1).getValues();
-  vals.forEach((v, i) => setPreview_(sheet, map, i + 2, String(v[0] || '')));
-}
 
 /* ---------------- celebration background pictures ---------------- */
 // Tab "Celebrations": one row per celebration with a picture link (Drive or any image URL).
@@ -428,47 +506,8 @@ function celOnEdit_(sh, range){
 
 /* ---------------- helpers ---------------- */
 
-function isHymnRow_(row, map){
-  return !!(String(row[map.id] || '').trim() || String(row[map.title] || '').trim());
-}
 
-// Moves every hymn row up to start at row 2 and clears leftover empty/tickbox-only rows.
-function compact_(sheet, map){
-  const last = sheet.getLastRow();
-  if(last < 2) return;
-  const width = sheet.getLastColumn();
-  const range = sheet.getRange(2, 1, last - 1, width);
-  const vals = range.getValues(), formulas = range.getFormulas();
-  const rows = [];
-  vals.forEach((row, r) => {
-    if(!isHymnRow_(row, map)) return;
-    rows.push(row.map((v, c) => formulas[r][c] ? formulas[r][c] : v));
-  });
-  range.removeCheckboxes();
-  range.clearContent();
-  if(rows.length){
-    ['id','title','category','celebration','length','audioLink'].forEach(f => {
-      if(map[f] !== undefined) sheet.getRange(2, map[f] + 1, rows.length, 1).setNumberFormat('@');
-    });
-    sheet.getRange(2, 1, rows.length, width).setValues(rows);
-    sheet.getRange(2, map.deleted + 1, rows.length, 1).insertCheckboxes();
-  }
-}
 
-function getSheet_(){
-  const ss = SpreadsheetApp.getActive();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if(!sheet) sheet = ss.insertSheet(SHEET_NAME);
-  const lastCol = Math.max(sheet.getLastColumn(), 1);
-  const existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
-  if(existing.every(x => !x)){
-    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-  } else {
-    const missing = HEADERS.filter(h => existing.indexOf(h) === -1);
-    if(missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing]);
-  }
-  return sheet;
-}
 
 function headerMap_(sheet){
   const hdr = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(x => String(x).trim());

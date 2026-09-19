@@ -28,6 +28,13 @@ No camera handy (e.g. on a PC)? In the scan window, pick a screenshot of the QR,
 connection code. Already connected on one device? Tap **Show QR** there and scan it from the other.
 Typing the URL and secret key by hand under **Connection** still works too.
 
+## Tabs
+One tab per house — **ንባብ ቤት, ዜማ ቤት, ቅዳሴ ቤት, አቋቋም ቤት, ትርጓሜ ቤት** — plus **Unsorted** (hymns not filed yet)
+and **Celebrations** (background pictures). The **folder** column holds the path inside the house, e.g.
+`ድጓ / ጥር / 11`. Rows are kept sorted by folder, then title. To move a hymn, change its folder text, or cut
+the row and paste it into another house's tab — the app follows on the next sync.
+(An older single "Hymns" tab is renamed to Unsorted automatically.)
+
 ## How it behaves
 | Column | Direction |
 |---|---|
