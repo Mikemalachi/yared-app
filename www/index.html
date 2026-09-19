@@ -905,10 +905,18 @@
           <button class="btn secondary block" id="autoSuggestBtn" style="flex:1;">✨ Auto-suggest</button>
         </div>
         <div id="autoSuggestProgress" style="font-size:12px; color:var(--ink-soft); margin-bottom:8px; display:none;"></div>
-        <div id="autoSuggestTune" style="display:none; align-items:center; gap:8px; margin-bottom:8px;">
-          <span style="flex:1; font-size:13px;">Suggested: <b id="autoSuggestCount"></b></span>
-          <button class="btn ghost" id="autoFewerBtn" style="padding:6px 12px;">− Fewer</button>
-          <button class="btn ghost" id="autoMoreBtn" style="padding:6px 12px;">+ More</button>
+        <div id="autoSuggestTune" style="display:none; flex-direction:column; gap:6px; margin-bottom:10px;" class="card">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="flex:1; font-size:13px;">Suggested: <b id="autoSuggestCount"></b></span>
+            <button class="btn ghost" id="autoFewerBtn" style="padding:6px 12px;">− Fewer</button>
+            <button class="btn ghost" id="autoMoreBtn" style="padding:6px 12px;">+ More</button>
+          </div>
+          <label style="font-size:12.5px;">Pause depth: <b id="autoThrVal"></b> <span style="color:var(--ink-soft);">(lower = more phrases)</span>
+            <input type="range" id="autoThreshold" min="2" max="20" step="0.5" value="5" style="width:100%;">
+          </label>
+          <label style="font-size:12.5px;">Shortest phrase: <b id="autoMinLenVal"></b>
+            <input type="range" id="autoMinLen" min="1" max="12" step="0.5" value="3" style="width:100%;">
+          </label>
         </div>
         <div class="phrase-map" id="phraseMap"></div>
         <button class="btn ghost block" id="clearPhrasesBtn" style="margin-top:10px;">Clear all phrases</button>
@@ -921,6 +929,7 @@
         <div class="source-toggle">
           <button type="button" id="teacherModeDefaultBtn" class="active">Default</button>
           <button type="button" id="teacherModeAbBtn">AB range</button>
+          <button type="button" id="teacherModePhrasesBtn">Phrases</button>
         </div>
         <div id="teacherDefaultFields">
           <label>Duration to repeat (sec)</label>
@@ -930,6 +939,15 @@
             <button data-target="teacherDuration" data-d="1">+</button>
           </div>
           <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;">Segment starts wherever playback currently is when you press Start.</div>
+        </div>
+        <div id="teacherPhraseFields" class="hidden">
+          <label>Phrases to play at a time</label>
+          <div class="num-stepper" style="margin-bottom:12px;">
+            <button data-target="teacherPhraseCount" data-d="-1">–</button>
+            <input type="number" id="teacherPhraseCount" value="1" min="1">
+            <button data-target="teacherPhraseCount" data-d="1">+</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;" id="teacherPhraseInfo">Uses the phrases marked in the Phrases tab.</div>
         </div>
         <div id="teacherAbFields" class="hidden">
           <div class="row" style="margin-bottom:12px;">
@@ -981,6 +999,7 @@
         <div class="source-toggle">
           <button type="button" id="contModeDefaultBtn" class="active">Default</button>
           <button type="button" id="contModeAbBtn">AB range</button>
+          <button type="button" id="contModePhrasesBtn">Phrases</button>
         </div>
         <div id="contDefaultFields">
           <label>Duration to repeat (sec)</label>
@@ -990,6 +1009,15 @@
             <button data-target="contDuration" data-d="1">+</button>
           </div>
           <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;">Segment starts wherever playback currently is when you press Start.</div>
+        </div>
+        <div id="contPhraseFields" class="hidden">
+          <label>Phrases to play at a time</label>
+          <div class="num-stepper" style="margin-bottom:12px;">
+            <button data-target="contPhraseCount" data-d="-1">–</button>
+            <input type="number" id="contPhraseCount" value="1" min="1">
+            <button data-target="contPhraseCount" data-d="1">+</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--ink-soft); margin:-8px 0 12px;" id="contPhraseInfo">Uses the phrases marked in the Phrases tab.</div>
         </div>
         <div id="contAbFields" class="hidden">
           <div class="row" style="margin-bottom:12px;">
@@ -3924,6 +3952,7 @@ document.getElementById('clearPhrasesBtn').addEventListener('click', async ()=>{
   renderPhraseMap();
 });
 function renderPhraseMap(){
+  if(typeof updatePhraseModeInfo==='function') updatePhraseModeInfo();
   const wrap = document.getElementById('phraseMap');
   if(!wrap) return;
   wrap.innerHTML='';
@@ -4046,23 +4075,41 @@ function analyzeDips(audioBuffer){
 }
 function pickDips(state, k){
   const byDepth = state.cands.slice().sort((a,b)=>b.prom-a.prom);
-  for(const minLen of [3, 2, 1.2]){
+  const m = state.minLen || 3;
+  const tries = [m, Math.min(m, 2), Math.min(m, 1.2)];
+  for(const minLen of tries){
     const chosen = [];
     for(const c of byDepth){
       if(chosen.length >= k) break;
       if(c.t - state.soundStart < minLen*0.5 || state.soundEnd - c.t < minLen*0.5) continue;
       if(chosen.every(x=>Math.abs(x-c.t) >= minLen)) chosen.push(c.t);
     }
-    if(chosen.length >= k || minLen === 1.2) return chosen.sort((a,b)=>a-b);
+    if(chosen.length >= k || minLen === tries[tries.length-1]) return chosen.sort((a,b)=>a-b);
   }
   return [];
 }
+function dipCountForThreshold(state){
+  // every dip at least `thr` dB deep, spaced by the shortest-phrase setting
+  const strong = {...state, cands: state.cands.filter(c=>c.prom >= state.thr)};
+  const byDepth = strong.cands.slice().sort((a,b)=>b.prom-a.prom);
+  const chosen = [];
+  for(const c of byDepth){
+    if(c.t - state.soundStart < state.minLen*0.5 || state.soundEnd - c.t < state.minLen*0.5) continue;
+    if(chosen.every(x=>Math.abs(x-c.t) >= state.minLen)) chosen.push(c.t);
+  }
+  return chosen.length;
+}
 function defaultDipCount(state){
-  // every clear dip (≥ 5 dB) with at least ~3 s between phrases
-  const strong = {...state, cands: state.cands.filter(c=>c.prom >= 5)};
-  let n = pickDips(strong, 999).length;
+  let n = dipCountForThreshold(state);
   if(!n && state.cands.length) n = Math.min(3, pickDips(state, 999).length);
   return n;
+}
+function renderAutoTuneLabels(){
+  const st = autoSuggestState; if(!st) return;
+  document.getElementById('autoThreshold').value = st.thr;
+  document.getElementById('autoMinLen').value = st.minLen;
+  document.getElementById('autoThrVal').textContent = st.thr + ' dB';
+  document.getElementById('autoMinLenVal').textContent = st.minLen + ' s';
 }
 async function applyAutoSuggest(){
   const st = autoSuggestState;
@@ -4072,6 +4119,7 @@ async function applyAutoSuggest(){
   await rebuildPhraseSections([...st.base, ...chosen]);
   const n = (currentHymn.sections||[]).length;
   document.getElementById('autoSuggestTune').style.display = 'flex';
+  renderAutoTuneLabels();
   document.getElementById('autoSuggestCount').textContent = n + ' phrase' + (n===1?'':'s');
   document.getElementById('autoFewerBtn').disabled = st.k <= 0;
   document.getElementById('autoMoreBtn').disabled = pickDips(st, st.k+1).length <= st.k;
@@ -4105,7 +4153,9 @@ async function autoSuggestBoundaries(){
     if(!res.cands.length){
       toast('No clear pauses found — mark phrases with “+ Mark boundary here” instead');
     } else {
-      autoSuggestState = {hymnId:currentHymn.id, base, cands:res.cands, soundStart:res.soundStart, soundEnd:res.soundEnd, k:0};
+      const prevTune = autoSuggestState || {};
+      autoSuggestState = {hymnId:currentHymn.id, base, cands:res.cands, soundStart:res.soundStart, soundEnd:res.soundEnd, k:0,
+                          thr: prevTune.thr || 5, minLen: prevTune.minLen || 3};
       autoSuggestState.k = defaultDipCount(autoSuggestState);
       await applyAutoSuggest();
       toast('Suggested ' + (currentHymn.sections||[]).length + ' phrases — use Fewer / More to adjust');
@@ -4118,6 +4168,14 @@ async function autoSuggestBoundaries(){
 document.getElementById('autoSuggestBtn').addEventListener('click', autoSuggestBoundaries);
 document.getElementById('autoFewerBtn').addEventListener('click', ()=>{ if(autoSuggestState && autoSuggestState.k>0){ autoSuggestState.k--; applyAutoSuggest(); } });
 document.getElementById('autoMoreBtn').addEventListener('click', ()=>{ if(autoSuggestState){ autoSuggestState.k++; applyAutoSuggest(); } });
+document.getElementById('autoThreshold').addEventListener('input', (e)=>{
+  const st = autoSuggestState; if(!st) return;
+  st.thr = +e.target.value; st.k = dipCountForThreshold(st); applyAutoSuggest();
+});
+document.getElementById('autoMinLen').addEventListener('input', (e)=>{
+  const st = autoSuggestState; if(!st) return;
+  st.minLen = +e.target.value; st.k = dipCountForThreshold(st); applyAutoSuggest();
+});
 
 
 
@@ -4157,6 +4215,7 @@ const paneCfg = {
     setA:'teacherSetA', setB:'teacherSetB', aVal:'teacherAVal', bVal:'teacherBVal',
     start:'startTeacher', stop:'stopTeacher',
     prev:'teacherPrevBtn', next:'teacherNextBtn', fromStart:'teacherFromStartBtn',
+    phrasesBtn:'teacherModePhrasesBtn', phraseFields:'teacherPhraseFields', phraseCount:'teacherPhraseCount', phraseInfo:'teacherPhraseInfo',
     repeats:null
   },
   continuous: {
@@ -4166,6 +4225,7 @@ const paneCfg = {
     setA:'contSetA', setB:'contSetB', aVal:'contAVal', bVal:'contBVal',
     start:'startContinuous', stop:'stopContinuous',
     prev:'contPrevBtn', next:'contNextBtn',
+    phrasesBtn:'contModePhrasesBtn', phraseFields:'contPhraseFields', phraseCount:'contPhraseCount', phraseInfo:'contPhraseInfo',
     repeats:'contRepeats'
   }
 };
@@ -4178,6 +4238,46 @@ function setSubModeFor(pane, mode){
   document.getElementById(cfg.abBtn).classList.toggle('active', mode==='ab');
   document.getElementById(cfg.defaultFields).classList.toggle('hidden', mode!=='default');
   document.getElementById(cfg.abFields).classList.toggle('hidden', mode!=='ab');
+  document.getElementById(cfg.phrasesBtn).classList.toggle('active', mode==='phrases');
+  document.getElementById(cfg.phraseFields).classList.toggle('hidden', mode!=='phrases');
+  if(mode==='phrases') updatePhraseModeInfo();
+}
+/* ---- phrase-based segments: step through the marked phrases N at a time ---- */
+function phraseList(){ return (currentHymn && currentHymn.sections) || []; }
+function phrasesPerFor(pane){ return Math.max(1, parseInt(document.getElementById(paneCfg[pane].phraseCount).value)||1); }
+function phraseGroupAt(idx, n){
+  const ps = phraseList();
+  if(idx < 0 || idx >= ps.length) return null;
+  const last = ps[Math.min(ps.length, idx+n) - 1];
+  return {start:ps[idx].start, len:Math.max(0.1, last.end - ps[idx].start)};
+}
+function setPhraseGroup(idx){
+  const g = phraseGroupAt(idx, practice.phrasesPer||1);
+  if(!g) return false;
+  practice.phraseIdx = idx; practice.segStart = g.start; practice.segLength = g.len;
+  return true;
+}
+function advanceGroup(){
+  if(practice.subMode !== 'phrases'){ practice.segStart += practice.segLength; return true; }
+  return setPhraseGroup(practice.phraseIdx + practice.phrasesPer);
+}
+function retreatGroup(){
+  if(practice.subMode !== 'phrases'){ practice.segStart = Math.max(0, practice.segStart - practice.segLength); return; }
+  setPhraseGroup(Math.max(0, practice.phraseIdx - practice.phrasesPer));
+}
+function phraseGroupLabel(){
+  if(practice.subMode !== 'phrases') return '';
+  const total = phraseList().length, a = practice.phraseIdx + 1, b = Math.min(total, practice.phraseIdx + practice.phrasesPer);
+  return (a === b ? `Phrase ${a}` : `Phrases ${a}–${b}`) + ` of ${total} · `;
+}
+function updatePhraseModeInfo(){
+  const n = phraseList().length;
+  ['teacher','continuous'].forEach(pane=>{
+    const el = document.getElementById(paneCfg[pane].phraseInfo);
+    if(el) el.textContent = n
+      ? `Uses the ${n} phrase${n===1?'':'s'} marked in the Phrases tab, starting from the phrase playing now. Pause = length of what just played + your extra seconds.`
+      : 'No phrases marked yet — mark them in the Phrases tab (✨ Auto-suggest or + Mark boundary) first.';
+  });
 }
 function updateAbFieldDisplay(pane){
   const cfg = paneCfg[pane], store = abStoreFor(pane);
@@ -4188,6 +4288,8 @@ function updateAbFieldDisplay(pane){
   const cfg = paneCfg[pane];
   document.getElementById(cfg.defaultBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'default'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
   document.getElementById(cfg.abBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'ab'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.phrasesBtn).addEventListener('click', ()=>{ setSubModeFor(pane,'phrases'); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
+  document.getElementById(cfg.phraseCount).addEventListener('input', ()=>{ if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
   document.getElementById(cfg.setA).addEventListener('click', ()=>{ abStoreFor(pane).a=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
   document.getElementById(cfg.setB).addEventListener('click', ()=>{ abStoreFor(pane).b=audio.currentTime; updateAbFieldDisplay(pane); if(typeof updateContinuousEstimate==='function') updateContinuousEstimate(); });
 });
@@ -4196,8 +4298,16 @@ function readPaneConfig(pane){
   const cfg = paneCfg[pane];
   const subMode = subModeFor(pane);
   const extraSecs = parseFloat(document.getElementById(cfg.extra).value)||0;
-  let segStart, segLength;
-  if(subMode==='ab'){
+  let segStart, segLength, phraseIdx = 0, phrasesPer = 1;
+  if(subMode==='phrases'){
+    const ps = phraseList();
+    if(!ps.length){ toast('Mark phrases first — Phrases tab (✨ Auto-suggest or + Mark boundary)'); return null; }
+    const t = audio.currentTime || 0;
+    phraseIdx = Math.max(0, ps.findIndex(p=> t >= p.start - 0.05 && t < p.end - 0.05));
+    phrasesPer = phrasesPerFor(pane);
+    const g = phraseGroupAt(phraseIdx, phrasesPer);
+    segStart = g.start; segLength = g.len;
+  } else if(subMode==='ab'){
     const store = abStoreFor(pane);
     if(store.a==null || store.b==null || store.b<=store.a){ toast('Set A and B first'); return null; }
     segStart = store.a; segLength = store.b-store.a;
@@ -4206,7 +4316,7 @@ function readPaneConfig(pane){
     segStart = audio.currentTime;
   }
   const repeatCount = cfg.repeats ? (parseInt(document.getElementById(cfg.repeats).value)||1) : Infinity;
-  return {subMode, segStart, segLength, extraSecs, repeatCount};
+  return {subMode, segStart, segLength, extraSecs, repeatCount, phraseIdx, phrasesPer};
 }
 function seekAndPlay(t){ audio.currentTime = Math.max(0,t); audio.play(); }
 function getBounds(){
@@ -4223,6 +4333,7 @@ function startPane(pane){
   clearTimeout(practice.timer);
   practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
   practice.segStart=conf.segStart; practice.segLength=conf.segLength;
+  practice.phraseIdx=conf.phraseIdx; practice.phrasesPer=conf.phrasesPer;
   practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
   practice.repDone=0; practice.cumulative=false; practice.reviewPending=false; practice.waiting=false;
   contSegmentsSinceReview=0; teacherSegmentsSinceReview=0;
@@ -4246,6 +4357,7 @@ function startFromBeginning(pane){
     if(!conf) return;
     practice.active=true; practice.pane=pane; practice.subMode=conf.subMode;
     practice.segStart=conf.segStart; practice.segLength=conf.segLength;
+    practice.phraseIdx=conf.phraseIdx; practice.phrasesPer=conf.phrasesPer;
     practice.extraSecs=conf.extraSecs; practice.repeatCount=conf.repeatCount;
   }
   clearTimeout(practice.timer);
@@ -4276,6 +4388,28 @@ function fmtDurationLong(totalSeconds){
 }
 function calcContinuousEstimateSeconds(){
   if(!audio.duration || !isFinite(audio.duration)) return null;
+  if(contSubMode==='phrases'){
+    const ps = phraseList();
+    if(!ps.length) return null;
+    const n = phrasesPerFor('continuous');
+    const extraSecs = parseFloat(document.getElementById('contExtraSecs').value)||0;
+    const repeatCount = parseInt(document.getElementById('contRepeats').value)||1;
+    const cost = (len)=> repeatCount*(2*len+extraSecs);
+    const t = audio.currentTime||0;
+    let idx = Math.max(0, ps.findIndex(p=> t >= p.start - 0.05 && t < p.end - 0.05));
+    const beginningPoint = contBeginningPoint!=null ? contBeginningPoint : 0;
+    let total = 0, since = 0;
+    for(; idx < ps.length; idx += n){
+      const g = phraseGroupAt(idx, n);
+      total += cost(g.len);
+      if(contReviewEnabled() && ++since >= getContReviewEveryN()){
+        since = 0;
+        const reviewLen = (g.start + g.len) - beginningPoint;
+        if(reviewLen > 0) total += cost(reviewLen);
+      }
+    }
+    return total;
+  }
   let segStart, segLength;
   if(contSubMode==='ab'){
     if(contAB.a==null || contAB.b==null || contAB.b<=contAB.a) return null;
@@ -4323,7 +4457,7 @@ function nextSegment(pane){
   // Exiting a periodic review that was just heard — move to the real next segment.
   if(practice.cumulative && practice.reviewPending){
     practice.cumulative=false; practice.reviewPending=false;
-    practice.segStart += practice.segLength;
+    if(!advanceGroup()) toast('That was the last phrase');
     if(practice.subMode==='ab'){
       const store = abStoreFor(pane);
       store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
@@ -4350,10 +4484,13 @@ function nextSegment(pane){
   }
 
   if(practice.cumulative){
-    practice.cumulativeEnd += practice.segLength;
+    if(practice.subMode==='phrases'){
+      if(advanceGroup()) practice.cumulativeEnd = practice.segStart + practice.segLength;
+      else toast('That was the last phrase');
+    } else practice.cumulativeEnd += practice.segLength;
     seekAndPlay(practice.cumulativeStart);
   } else {
-    practice.segStart += practice.segLength;
+    if(!advanceGroup()) toast('That was the last phrase');
     if(practice.subMode==='ab'){
       const store = abStoreFor(pane);
       store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
@@ -4368,10 +4505,13 @@ function prevSegment(pane){
   if(!(practice.active && practice.pane===pane)){ toast('Press Start first'); return; }
   clearTimeout(practice.timer); practice.waiting=false; practice.repDone=0;
   if(practice.cumulative){
-    practice.cumulativeEnd = Math.max(practice.cumulativeStart+practice.segLength, practice.cumulativeEnd-practice.segLength);
+    if(practice.subMode==='phrases'){
+      retreatGroup();
+      practice.cumulativeEnd = Math.max(practice.cumulativeStart + 0.5, practice.segStart + practice.segLength);
+    } else practice.cumulativeEnd = Math.max(practice.cumulativeStart+practice.segLength, practice.cumulativeEnd-practice.segLength);
     seekAndPlay(practice.cumulativeStart);
   } else {
-    practice.segStart = Math.max(0, practice.segStart-practice.segLength);
+    retreatGroup();
     if(practice.subMode==='ab'){
       const store = abStoreFor(pane);
       store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
@@ -4430,8 +4570,15 @@ function advanceSegmentAuto(){
 function advanceSegmentReal(){
   practice.cumulative = false;
   practice.reviewPending = false;
-  practice.segStart += practice.segLength;
-  if(practice.pane==='continuous' && practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
+  if(practice.subMode==='phrases'){
+    if(!advanceGroup()){
+      if(practice.pane==='continuous'){ finishContinuous(); return; }
+      toast('That was the last phrase');
+    }
+  } else {
+    practice.segStart += practice.segLength;
+    if(practice.pane==='continuous' && practice.segStart + practice.segLength > audio.duration+0.25){ finishContinuous(); return; }
+  }
   if(practice.subMode==='ab'){
     const store = abStoreFor(practice.pane);
     store.a=practice.segStart; store.b=practice.segStart+practice.segLength;
@@ -4497,7 +4644,7 @@ function updatePracticeStatus(){
     : `${fmtTime(practice.segStart)}–${fmtTime(practice.segStart+practice.segLength)}`;
   const repInfo = (practice.pane==='continuous' && !practice.cumulative && isFinite(practice.repeatCount))
     ? ` · repeat ${Math.min(practice.repDone+1, practice.repeatCount)}/${practice.repeatCount}` : '';
-  el.textContent = `${label} — ${range}${repInfo}${practice.waiting?' (paused)':''}`;
+  el.textContent = `${label} — ${practice.cumulative ? '' : phraseGroupLabel()}${range}${repInfo}${practice.waiting?' (paused)':''}`;
 }
 document.getElementById('startTeacher').addEventListener('click', ()=>startPane('teacher'));
 document.getElementById('stopTeacher').addEventListener('click', stopPractice);
