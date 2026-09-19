@@ -205,6 +205,61 @@
   }
   @media (max-width:560px){ .fab{right:18px;} }
 
+
+  /* Kebero practice drum */
+  .kb-grid{display:grid; gap:6px; margin:6px 0 4px;}
+  .kb-step{aspect-ratio:1/1; border-radius:12px; border:2px solid var(--line); background:var(--surface);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; color:var(--ink-soft);
+    cursor:pointer; user-select:none; -webkit-user-select:none; transition:transform .06s, box-shadow .06s; position:relative;}
+  .kb-step.beat{border-color:var(--gold);}
+  .kb-step.dum{background:var(--ink); color:var(--parchment); border-color:var(--ink);}
+  .kb-step.tak{background:var(--gold); color:#fff; border-color:var(--gold);}
+  .kb-step.now{transform:scale(1.08); box-shadow:0 0 0 3px var(--gold-bright);}
+  .kb-step .n{position:absolute; top:2px; left:5px; font-size:9px; font-weight:500; opacity:.6; z-index:1;}
+  .kb-transport{display:flex; align-items:center; gap:10px; margin:12px 0;}
+  .kb-play{width:64px; height:64px; border-radius:50%; border:none; background:var(--ink); color:var(--parchment); font-size:24px; flex:0 0 auto;}
+  .kb-bpm{flex:1;}
+  .kb-bpm .v{font-size:26px; font-weight:700; line-height:1;}
+  .kb-bpm .l{font-size:11.5px; color:var(--ink-soft);}
+  .kb-pads{display:flex; gap:10px; margin:8px 0;}
+  .kb-pad{flex:1; height:110px; border-radius:18px; border:none; font-size:22px; font-weight:700; touch-action:manipulation;
+    user-select:none; -webkit-user-select:none; transition:transform .05s, filter .05s;}
+  .kb-pad.dum{background:var(--ink); color:var(--parchment);}
+  .kb-pad.tak{background:var(--gold); color:#fff;}
+  .kb-pad small{display:block; font-size:11.5px; font-weight:500; opacity:.8; margin-top:4px;}
+  .kb-pad.hit{transform:scale(.95); filter:brightness(1.25);}
+  .kb-recbar{height:6px; border-radius:3px; background:var(--line); overflow:hidden; margin-top:6px;}
+  .kb-recbar div{height:100%; width:0; background:#B23A3A;}
+  .kb-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;}
+  .kb-chips .chip{cursor:pointer;}
+  .kb-chips .chip.on{background:var(--ink); color:var(--parchment); border-color:var(--ink);}
+  .kb-chips .chip .x{margin-left:6px; opacity:.6;}
+  .kb-sound-row{display:flex; align-items:center; gap:8px; margin:8px 0; flex-wrap:wrap;}
+  .kb-sound-row .name{font-weight:600; width:64px;}
+  .kb-sound-row .st{font-size:12px; color:var(--ink-soft); flex:1 1 100%;}
+  .kb-step{overflow:hidden;}
+  .kb-step .m{position:relative; z-index:1;}
+  .kb-step.ts .m{margin-bottom:34%;}
+  .kb-step .c{position:absolute; left:0; right:0; bottom:0; height:36%; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#EEF1F5,#AEB8C4); color:#2B2118; font-size:12px; font-weight:800; letter-spacing:.5px;}
+  .kb-step.tsonly{background:linear-gradient(135deg,#EEF1F5,#AEB8C4); color:#2B2118; border-color:#9AA6B4;}
+  .kb-brushes{display:flex; gap:5px; flex-wrap:wrap; margin:4px 0 8px;}
+  .kb-brush{flex:1 1 0; min-width:44px; padding:7px 4px; border-radius:10px; border:2px solid var(--line); background:var(--surface);
+    font-weight:700; font-size:13px; color:var(--ink); text-align:center; cursor:pointer;}
+  .kb-brush small{display:block; font-size:9.5px; font-weight:500; opacity:.7;}
+  .kb-brush.on{border-color:var(--gold); box-shadow:0 0 0 2px var(--gold);}
+  .kb-pad.ts{background:linear-gradient(135deg,#E3E8EE,#9AA6B4); color:#2B2118;}
+  .kb-num{display:flex; align-items:center; gap:4px;}
+  .kb-num input{width:56px; text-align:center;}
+  /* faint background picture */
+  #appBg{position:fixed; inset:0; z-index:0; pointer-events:none; background-repeat:no-repeat; background-position:center;
+    opacity:0; transition:opacity .25s;}
+  body.has-bg #app{background:transparent; z-index:1;}
+  .cel-bg-row{display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid var(--line);}
+  .cel-bg-row .th{width:42px; height:42px; border-radius:8px; flex:0 0 auto; background:var(--parchment-dim) center/cover no-repeat;
+    border:1px dashed var(--line);}
+  .cel-bg-row .th.set{border-style:solid;}
+  .cel-bg-row .nm{flex:1; font-size:13px;}
   /* Modal */
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(43,33,24,0.5); z-index:50; display:none;
@@ -460,6 +515,7 @@
 </style>
 </head>
 <body>
+<div id="appBg" aria-hidden="true"></div>
 <div id="app">
 
   <header class="topbar">
@@ -493,6 +549,14 @@
         <button class="btn secondary" id="goRevision">Open</button>
       </div>
 
+      <div class="card" id="keberoCard" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <div>
+          <div style="font-weight:600; font-size:14.5px;">🥁 Kebero practice drum</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Keep the beat — ዝማሜ, መረግድ, ጽፋት or your own pattern</div>
+        </div>
+        <button class="btn secondary" id="goKebero">Open</button>
+      </div>
+
       <div class="row" style="margin-bottom:14px;">
         <div class="card" id="queueSummaryCard" style="flex:1; margin-bottom:0; cursor:pointer;">
           <div style="font-weight:600; font-size:13.5px;">Queue</div>
@@ -514,6 +578,40 @@
 
       <div class="section-title">Recently added</div>
       <div id="recentList"></div>
+
+      <div class="section-title">Appearance</div>
+      <div class="card" id="appearanceCard">
+        <div style="font-size:13.5px; font-weight:600; margin-bottom:6px;">Theme</div>
+        <div class="row" style="gap:6px; margin-bottom:12px;">
+          <button class="btn" id="themeLightBtn" style="flex:1;">☀️ Light</button>
+          <button class="btn ghost" id="themeDarkBtn" style="flex:1;">🌙 Dark</button>
+        </div>
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+          <span style="font-size:13.5px; font-weight:600;">Celebration backgrounds</span>
+          <input type="checkbox" id="bgEnabled" style="width:auto;">
+        </label>
+        <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:8px;">When a hymn is loaded, the picture for its celebration shows faintly behind the app. Celebrations without a picture keep the plain background.</div>
+        <details id="celBgDetails" style="margin-bottom:10px;">
+          <summary style="cursor:pointer; font-size:13px; font-weight:600; padding:6px 0;" id="celBgSummary">Pictures for celebrations</summary>
+          <div id="celBgList"></div>
+        </details>
+        <input type="file" id="bgFileInput" accept="image/*" class="hidden">
+        <div id="bgOptions">
+          <label style="display:flex; align-items:center; gap:10px; font-size:13px; margin-bottom:8px;">
+            <span style="width:110px;">☀️ Light mode</span><input type="range" id="bgOpLight" min="0" max="35" step="1" style="flex:1;"><span id="bgOpLightVal" style="width:34px; text-align:right;"></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; font-size:13px; margin-bottom:8px;">
+            <span style="width:110px;">🌙 Dark mode</span><input type="range" id="bgOpDark" min="0" max="35" step="1" style="flex:1;"><span id="bgOpDarkVal" style="width:34px; text-align:right;"></span>
+          </label>
+          <div class="row" style="gap:6px; align-items:center;">
+            <select id="bgSize" style="flex:1;">
+              <option value="fit">Fit (whole picture)</option>
+              <option value="fill">Fill the screen</option>
+            </select>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; flex:1; justify-content:flex-end;">Black &amp; white <input type="checkbox" id="bgGray" style="width:auto;"></label>
+          </div>
+        </div>
+      </div>
 
       <div class="section-title">Reminders</div>
       <div class="card">
@@ -612,6 +710,109 @@
       <div class="heat-wrap"><div class="heatmap" id="heatmapGrid"></div></div>
       <div class="section-title">By category</div>
       <div id="categoryStats"></div>
+    </section>
+
+    <!-- KEBERO -->
+    <section class="screen" id="screen-kebero">
+      <div class="back-row"><button id="keberoBack">‹</button><h2 class="serif">Kebero</h2></div>
+
+      <div class="kb-chips" id="kbPresetChips"></div>
+
+      <div class="kb-brushes" id="kbBrushes">
+        <button class="kb-brush" data-kbbrush="1">ዱ<small>dum</small></button>
+        <button class="kb-brush" data-kbbrush="3">ዱ+ጽ<small>dum·ch</small></button>
+        <button class="kb-brush" data-kbbrush="2">ታ<small>tak</small></button>
+        <button class="kb-brush" data-kbbrush="4">ታ+ጽ<small>tak·ch</small></button>
+        <button class="kb-brush" data-kbbrush="5">ጽ<small>tsenatsil</small></button>
+        <button class="kb-brush" data-kbbrush="0">·<small>rest</small></button>
+      </div>
+      <div class="kb-grid" id="kbGrid"></div>
+      <div style="font-size:11.5px; color:var(--ink-soft);">Pick a sound above, then tap boxes to place it (tap again to clear). ዱ = big side, ታ = small side, ጽ = tsenatsil. Gold outline = start of each beat.</div>
+
+      <div class="kb-transport">
+        <button class="kb-play" id="kbPlayBtn" aria-label="Play or stop">▶</button>
+        <div class="kb-bpm">
+          <div class="row" style="align-items:center; gap:8px;">
+            <button class="btn ghost" id="kbBpmDown" style="padding:6px 12px;">−</button>
+            <div style="text-align:center; flex:1;"><div class="v" id="kbBpmVal">80</div><div class="l">beats per minute</div></div>
+            <button class="btn ghost" id="kbBpmUp" style="padding:6px 12px;">+</button>
+          </div>
+          <input type="range" id="kbBpm" min="10" max="220" step="1" value="80">
+        </div>
+      </div>
+      <div class="row" style="gap:8px; margin-bottom:10px;">
+        <button class="btn secondary" id="kbTapBtn" style="flex:1;">👆 Tap tempo</button>
+      </div>
+      <div class="row" style="gap:10px; margin-bottom:10px; align-items:center;">
+        <div style="flex:1;">
+          <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:3px;">Steps (2–50)</div>
+          <div class="kb-num">
+            <button class="btn ghost" id="kbStepsDown" style="padding:6px 12px;">−</button>
+            <input type="number" id="kbSteps" min="2" max="50" step="1" value="8" inputmode="numeric">
+            <button class="btn ghost" id="kbStepsUp" style="padding:6px 12px;">+</button>
+          </div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:3px;">Steps per beat</div>
+          <select id="kbSpb" style="width:100%;">
+            <option value="1">1 (each step = a beat)</option>
+            <option value="2">2 (half beats)</option>
+            <option value="3">3 (triplets)</option>
+            <option value="4">4 (quarter beats)</option>
+          </select>
+        </div>
+      </div>
+      <label style="display:flex; align-items:center; gap:10px; font-size:13px; margin-bottom:6px;">
+        <span style="width:60px;">Volume</span><input type="range" id="kbVolume" min="0" max="100" value="85" style="flex:1;">
+      </label>
+      <div class="row" style="gap:8px;">
+        <button class="btn ghost" id="kbSaveBtn" style="flex:1;">💾 Save pattern</button>
+        <button class="btn ghost" id="kbClearBtn" style="flex:1;">Clear grid</button>
+      </div>
+
+      <div class="section-title">Play live · record a pattern</div>
+      <div class="kb-pads">
+        <button class="kb-pad dum" id="kbPadDum">ዱም<small>big side · D</small></button>
+        <button class="kb-pad tak" id="kbPadTak">ታክ<small>small side · K</small></button>
+        <button class="kb-pad ts" id="kbPadTs">ጽናጽል<small>tsenatsil · L</small></button>
+      </div>
+      <button class="btn block" id="kbRecBtn" style="width:100%;">⏺ Record a pattern</button>
+      <div class="kb-recbar"><div id="kbRecProgress"></div></div>
+      <div id="kbRecMsg" style="font-size:12px; color:var(--ink-soft); margin-top:6px;">Press record, then drum one round on the pads. Recording starts at your first hit and lasts one round of the grid at the current tempo. Hit ጽናጽል together with ዱም or ታክ to get ዱ+ጽ / ታ+ጽ.</div>
+
+      <div class="section-title">Drum sound</div>
+      <div class="card">
+        <div class="seg" style="display:flex; gap:6px; margin-bottom:6px;">
+          <button class="btn secondary" id="kbSoundBuiltin" style="flex:1;">Built-in</button>
+          <button class="btn ghost" id="kbSoundCustom" style="flex:1;">My recordings</button>
+        </div>
+        <div class="kb-sound-row">
+          <span class="name">ዱም</span>
+          <button class="btn ghost" data-kbrec="dum">🎙 Record</button>
+          <button class="btn ghost" data-kbfile="dum">📁 File</button>
+          <button class="btn ghost" data-kbtest="dum">▶</button>
+          <button class="btn ghost" data-kbreset="dum">✕</button>
+          <div class="st" id="kbStatus-dum">Using built-in sound</div>
+        </div>
+        <div class="kb-sound-row">
+          <span class="name">ታክ</span>
+          <button class="btn ghost" data-kbrec="tak">🎙 Record</button>
+          <button class="btn ghost" data-kbfile="tak">📁 File</button>
+          <button class="btn ghost" data-kbtest="tak">▶</button>
+          <button class="btn ghost" data-kbreset="tak">✕</button>
+          <div class="st" id="kbStatus-tak">Using built-in sound</div>
+        </div>
+        <div class="kb-sound-row">
+          <span class="name">ጽናጽል</span>
+          <button class="btn ghost" data-kbrec="ts">🎙 Record</button>
+          <button class="btn ghost" data-kbfile="ts">📁 File</button>
+          <button class="btn ghost" data-kbtest="ts">▶</button>
+          <button class="btn ghost" data-kbreset="ts">✕</button>
+          <div class="st" id="kbStatus-ts">Using built-in sound</div>
+        </div>
+        <input type="file" id="kbFileInput" accept="audio/*" class="hidden">
+        <div style="font-size:11.5px; color:var(--ink-soft);">Record one single hit on each side of your kebero and one shake of the tsenatsil (each recording listens for about 2 seconds; silence at the start is trimmed off).</div>
+      </div>
     </section>
 
     <!-- PLAYER -->
@@ -1321,7 +1522,7 @@ function showFinishOverlay(){
 /* ============================================================
    NAVIGATION
    ============================================================ */
-const screens = ['home','library','player','revision','queue','stats'];
+const screens = ['home','library','player','revision','queue','stats','kebero'];
 function showScreen(name){
   screens.forEach(s=>{
     document.getElementById('screen-'+s).classList.toggle('active', s===name);
@@ -1330,11 +1531,14 @@ function showScreen(name){
     b.classList.toggle('active', b.dataset.screen===name);
   });
   document.getElementById('app').classList.toggle('player-mode', name==='player');
+  document.getElementById('addHymnFab').style.display = name==='kebero' ? 'none' : '';
   if(name==='home') renderHome();
   if(name==='library') renderLibrary();
   if(name==='revision') renderRevisionScreen();
   if(name==='queue') renderQueueScreen();
   if(name==='stats') renderStatsScreen();
+  if(name!=='kebero' && typeof keberoStop==='function') keberoStop();
+  if(name==='kebero' && typeof keberoOpen==='function') keberoOpen();
   if(name==='player' && typeof positionPinnedBlock==='function'){
     requestAnimationFrame(positionPinnedBlock);
   }
@@ -1375,6 +1579,7 @@ async function getAudioPlaybackUrl(h){
 async function loadHymns(){
   hymns = await dbGetAll('hymns');
   hymns.sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+  if(typeof applyAppBackground==='function' && appearanceReady) applyAppBackground(); // a celebration may have been edited
 }
 
 async function saveHymnFromForm(){
@@ -3079,6 +3284,7 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
   document.getElementById('teacherBeginningVal').textContent='';
 
   currentHymn = h;
+  if(typeof applyAppBackground==='function') applyAppBackground();
   currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
   queueIndex = currentQueue.indexOf(hymnId);
   pageIndex = 0;
@@ -4301,6 +4507,7 @@ function setupNativeNotificationBridge(){
 function applyDarkMode(dark){
   document.body.classList.toggle('dark', dark);
   document.getElementById('darkModeToggle').textContent = dark ? '☀️' : '🌙';
+  if(typeof applyAppBackground === 'function'){ applyAppBackground(); try{ renderAppearance(); }catch(e){} }
 }
 document.getElementById('darkModeToggle').addEventListener('click', async ()=>{
   const dark = !document.body.classList.contains('dark');
@@ -4912,9 +5119,630 @@ document.getElementById('sheetOpenBtn').addEventListener('click', async ()=>{
   }catch(e){ toast('Could not reach the sheet: '+(e && e.message ? e.message : 'error')); }
 });
 
+/* ============================================================
+   KEBERO PRACTICE DRUM — a standalone rhythm trainer.
+   Pattern = array of steps (0 rest, 1 dum = big side, 2 tak = small
+   side); 2 steps per beat. Sounds are scheduled ahead on the Web Audio
+   clock (not setTimeout) so the beat stays steady even if the page is
+   busy. Built-in sounds are synthesised; the learner can replace them
+   with single hits recorded from a real kebero.
+   The presets are only starting points — edit them to match how your
+   teacher plays.
+   ============================================================ */
+const KB_PRESETS = [
+  {name:'ዝማሜ',  hint:'slow',   bpm:56,  steps:8, spb:2, pattern:[3,0,0,0,4,0,2,0]},
+  {name:'መረግድ', hint:'medium', bpm:84,  steps:8, spb:2, pattern:[3,0,2,0,1,0,4,0]},
+  {name:'ጽፋት',  hint:'fast',   bpm:126, steps:8, spb:2, pattern:[3,0,2,2,1,0,4,2]}
+];
+// step values: 0 rest, 1 ዱ dum, 2 ታ tak, 3 ዱ+ጽ, 4 ታ+ጽ, 5 ጽ tsenatsil only
+const KB_LABEL = ['·','ዱ','ታ','ዱ','ታ','ጽ'];
+const KB_SOUND_NAME = {dum:'ዱም', tak:'ታክ', ts:'ጽናጽል'};
+let kb = {bpm:84, steps:8, spb:2, pattern:[3,0,2,0,1,0,4,0], preset:'መረግድ', volume:85, soundMode:'builtin', custom:[]};
+let kbBrush = 1;
+let kbLoaded = false;
+let kbCtx = null, kbMaster = null, kbNoise = null;
+const kbBuffers = {dum:null, tak:null, ts:null};
+let kbPlaying = false, kbTimer = 0, kbNextTime = 0, kbStepIdx = 0, kbVisQueue = [], kbRaf = 0, kbShown = -1;
+let kbTaps = [];
+let kbRec = null;
+
+async function keberoLoad(){
+  if(kbLoaded) return;
+  kbLoaded = true;
+  try{
+    const rec = await dbGet('meta','kebero');
+    if(rec && rec.value) kb = Object.assign(kb, rec.value);
+  }catch(e){}
+  if(!kb.spb) kb.spb = 2;
+  for(const kind of ['dum','tak','ts']){
+    try{
+      const m = await dbGet('media','kebero-'+kind);
+      if(m && m.blob) kbBuffers[kind] = await kbDecodeHit(m.blob);
+    }catch(e){ kbBuffers[kind] = null; }
+  }
+}
+function keberoSave(){ dbPut('meta', {key:'kebero', value:kb}).catch(()=>{}); }
+async function keberoOpen(){
+  await keberoLoad();
+  kbRenderAll();
+}
+
+/* ---------- audio ---------- */
+function kbAudio(){
+  if(!kbCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    kbCtx = new AC();
+    kbMaster = kbCtx.createGain();
+    kbMaster.connect(kbCtx.destination);
+    const len = Math.floor(kbCtx.sampleRate * 0.5);
+    kbNoise = kbCtx.createBuffer(1, len, kbCtx.sampleRate);
+    const d = kbNoise.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  }
+  if(kbCtx.state === 'suspended') kbCtx.resume();
+  kbMaster.gain.value = (kb.volume/100) * 0.9;
+  return kbCtx;
+}
+function kbEnv(g, t, peak, attack, decay){
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+}
+function kbNoiseBurst(t, vel, type, freq, q, decay){
+  const ctx = kbCtx;
+  const src = ctx.createBufferSource(); src.buffer = kbNoise;
+  const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = ctx.createGain(); kbEnv(g, t, vel, 0.002, decay);
+  src.connect(f); f.connect(g); g.connect(kbMaster);
+  src.start(t); src.stop(t + decay + 0.05);
+}
+function kbSynthDum(t, vel){
+  const ctx = kbCtx;
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(125, t);
+  o.frequency.exponentialRampToValueAtTime(52, t + 0.22);
+  const g = ctx.createGain(); kbEnv(g, t, 1.0*vel, 0.004, 0.55);
+  o.connect(g); g.connect(kbMaster); o.start(t); o.stop(t + 0.65);
+  const o2 = ctx.createOscillator(); o2.type = 'triangle';
+  o2.frequency.setValueAtTime(190, t); o2.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+  const g2 = ctx.createGain(); kbEnv(g2, t, 0.25*vel, 0.003, 0.18);
+  o2.connect(g2); g2.connect(kbMaster); o2.start(t); o2.stop(t + 0.25);
+  kbNoiseBurst(t, 0.35*vel, 'lowpass', 900, 0.7, 0.06); // the hand slap
+}
+function kbSynthTak(t, vel){
+  const ctx = kbCtx;
+  const o = ctx.createOscillator(); o.type = 'triangle';
+  o.frequency.setValueAtTime(520, t);
+  o.frequency.exponentialRampToValueAtTime(300, t + 0.06);
+  const g = ctx.createGain(); kbEnv(g, t, 0.55*vel, 0.002, 0.14);
+  o.connect(g); g.connect(kbMaster); o.start(t); o.stop(t + 0.2);
+  kbNoiseBurst(t, 0.5*vel, 'bandpass', 2600, 1.2, 0.05);
+}
+function kbSynthTs(t, vel){
+  // tsenatsil: metal discs rattling on rods — a few quick high, bright bursts plus ringing partials
+  const ctx = kbCtx;
+  for(let i=0;i<4;i++){
+    kbNoiseBurst(t + i*0.017 + Math.random()*0.004, (0.34 - i*0.06)*vel, 'highpass', 5200 + i*300, 0.8, 0.07);
+  }
+  [3150, 4380, 5710, 7230, 8890].forEach((f, i)=>{
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f*(1+Math.random()*0.01), t);
+    const g = ctx.createGain(); kbEnv(g, t + i*0.004, 0.045*vel, 0.002, 0.28 - i*0.03);
+    o.connect(g); g.connect(kbMaster); o.start(t); o.stop(t + 0.35);
+  });
+}
+function kbPlayValue(v, t, vel){
+  if(v === 1 || v === 3) kbHit('dum', t, vel);
+  if(v === 2 || v === 4) kbHit('tak', t, vel);
+  if(v >= 3) kbHit('ts', t, vel*0.9);
+}
+function kbHit(kind, t, vel){
+  const ctx = kbAudio();
+  if(t === undefined) t = ctx.currentTime + 0.005;
+  if(vel === undefined) vel = 1;
+  const buf = kb.soundMode === 'custom' ? kbBuffers[kind] : null;
+  if(buf){
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const g = ctx.createGain(); g.gain.value = vel;
+    src.connect(g); g.connect(kbMaster); src.start(t);
+    return;
+  }
+  if(kind === 'dum') kbSynthDum(t, vel);
+  else if(kind === 'tak') kbSynthTak(t, vel);
+  else kbSynthTs(t, vel);
+}
+
+/* ---------- scheduler ---------- */
+function kbStepDur(){ return 60 / kb.bpm / (kb.spb || 2); }
+function kbSchedule(){
+  const ctx = kbCtx;
+  while(kbNextTime < ctx.currentTime + 0.12){
+    if(kbStepIdx >= kb.steps) kbStepIdx = 0;
+    const v = kb.pattern[kbStepIdx] || 0;
+    if(v) kbPlayValue(v, kbNextTime, kbStepIdx === 0 ? 1 : (kbStepIdx % (kb.spb||2) === 0 ? 0.9 : 0.78));
+    kbVisQueue.push({step:kbStepIdx, time:kbNextTime});
+    kbNextTime += kbStepDur();
+    kbStepIdx = (kbStepIdx + 1) % kb.steps;
+  }
+}
+function kbDraw(){
+  if(!kbPlaying) return;
+  const now = kbCtx.currentTime;
+  let step = kbShown;
+  while(kbVisQueue.length && kbVisQueue[0].time <= now){ step = kbVisQueue.shift().step; }
+  if(step !== kbShown){ kbShown = step; kbHighlight(step); }
+  kbRaf = requestAnimationFrame(kbDraw);
+}
+function kbHighlight(step){
+  document.querySelectorAll('#kbGrid .kb-step').forEach((el, i)=> el.classList.toggle('now', i === step));
+}
+function keberoStart(){
+  const ctx = kbAudio();
+  kbPlaying = true;
+  kbStepIdx = 0; kbShown = -1; kbVisQueue = [];
+  kbNextTime = ctx.currentTime + 0.08;
+  kbSchedule();
+  kbTimer = setInterval(kbSchedule, 25);
+  kbRaf = requestAnimationFrame(kbDraw);
+  document.getElementById('kbPlayBtn').textContent = '■';
+}
+function keberoStop(){
+  if(!kbPlaying) return;
+  kbPlaying = false;
+  clearInterval(kbTimer); cancelAnimationFrame(kbRaf);
+  kbVisQueue = []; kbShown = -1; kbHighlight(-1);
+  const b = document.getElementById('kbPlayBtn'); if(b) b.textContent = '▶';
+}
+
+/* ---------- UI ---------- */
+function kbRenderAll(){ kbRenderPresets(); kbRenderGrid(); kbRenderTempo(); kbRenderSound(); }
+function kbRenderPresets(){
+  const wrap = document.getElementById('kbPresetChips');
+  const all = KB_PRESETS.map(p=>({...p, builtin:true})).concat((kb.custom||[]).map(p=>({...p, builtin:false})));
+  wrap.innerHTML = all.map((p, i)=>`<span class="chip ${kb.preset===p.name?'on':''}" data-kbpreset="${i}">${escapeHtml(p.name)}${p.hint?` <span style="opacity:.6; font-size:11px;">${p.hint}</span>`:''}${p.builtin?'':'<span class="x" data-kbdel="'+i+'">✕</span>'}</span>`).join('');
+  wrap.querySelectorAll('[data-kbpreset]').forEach(el=>el.addEventListener('click', (e)=>{
+    const p = all[+el.dataset.kbpreset];
+    if(e.target.dataset.kbdel !== undefined){
+      if(!confirm('Delete the saved pattern “'+p.name+'”?')) return;
+      kb.custom = kb.custom.filter(c=>c.name !== p.name);
+      if(kb.preset === p.name) kb.preset = '';
+      keberoSave(); kbRenderPresets(); return;
+    }
+    kb.bpm = p.bpm; kb.steps = p.steps; kb.spb = p.spb || 2; kb.pattern = p.pattern.slice(); kb.preset = p.name;
+    keberoSave(); kbRenderAll();
+  }));
+}
+function kbRenderGrid(){
+  const g = document.getElementById('kbGrid');
+  const spb = kb.spb || 2;
+  const cols = Math.min(kb.steps, Math.max(spb, Math.floor(8/spb)*spb));
+  g.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  while(kb.pattern.length < kb.steps) kb.pattern.push(0);
+  kb.pattern.length = kb.steps;
+  const sub = spb===2 ? ['','&'] : spb===3 ? ['','·','·'] : spb===4 ? ['','e','&','a'] : [''];
+  g.innerHTML = kb.pattern.map((v, i)=>{
+    const beat = i % spb === 0;
+    const cls = ['kb-step', beat?'beat':'', (v===1||v===3)?'dum':'', (v===2||v===4)?'tak':'', (v===3||v===4)?'ts':'', v===5?'tsonly':''].join(' ');
+    const n = beat ? (i/spb + 1) : sub[i % spb];
+    const band = (v===3||v===4) ? '<span class="c">+ጽ</span>' : '';
+    return `<div class="${cls}" data-kbstep="${i}"><span class="n">${n}</span><span class="m">${KB_LABEL[v]||'·'}</span>${band}</div>`;
+  }).join('');
+  g.querySelectorAll('.kb-step').forEach(el=>el.addEventListener('click', ()=>{
+    const i = +el.dataset.kbstep;
+    kb.pattern[i] = kb.pattern[i] === kbBrush ? 0 : kbBrush;
+    if(kb.pattern[i]) kbPlayValue(kb.pattern[i], kbAudio().currentTime + 0.005, 1);
+    kb.preset = '';
+    keberoSave(); kbRenderGrid(); kbRenderPresets();
+  }));
+  document.getElementById('kbSteps').value = String(kb.steps);
+  document.getElementById('kbSpb').value = String(spb);
+  document.querySelectorAll('[data-kbbrush]').forEach(b=>b.classList.toggle('on', +b.dataset.kbbrush === kbBrush));
+}
+function kbRenderTempo(){
+  document.getElementById('kbBpmVal').textContent = kb.bpm;
+  document.getElementById('kbBpm').value = kb.bpm;
+  document.getElementById('kbVolume').value = kb.volume;
+}
+function kbRenderSound(){
+  const custom = kb.soundMode === 'custom';
+  document.getElementById('kbSoundBuiltin').className = 'btn ' + (custom ? 'ghost' : 'secondary');
+  document.getElementById('kbSoundCustom').className = 'btn ' + (custom ? 'secondary' : 'ghost');
+  for(const kind of ['dum','tak','ts']){
+    document.getElementById('kbStatus-'+kind).textContent = kbBuffers[kind]
+      ? (custom ? 'Using your recording ✓' : 'Recording saved — switch to “My recordings” to use it')
+      : (custom ? 'No recording yet — using built-in sound' : 'Using built-in sound');
+  }
+}
+function kbSetBpm(v){
+  kb.bpm = Math.max(10, Math.min(220, Math.round(v)));
+  kbRenderTempo(); keberoSave();
+}
+
+document.getElementById('goKebero').addEventListener('click', (e)=>{ e.stopPropagation(); showScreen('kebero'); });
+document.getElementById('keberoCard').addEventListener('click', ()=>showScreen('kebero'));
+document.getElementById('keberoBack').addEventListener('click', ()=>showScreen('home'));
+document.getElementById('kbPlayBtn').addEventListener('click', ()=>{ kbPlaying ? keberoStop() : keberoStart(); });
+document.getElementById('kbBpm').addEventListener('input', (e)=>kbSetBpm(+e.target.value));
+document.getElementById('kbBpmDown').addEventListener('click', ()=>kbSetBpm(kb.bpm-1));
+document.getElementById('kbBpmUp').addEventListener('click', ()=>kbSetBpm(kb.bpm+1));
+document.getElementById('kbVolume').addEventListener('input', (e)=>{
+  kb.volume = +e.target.value;
+  if(kbMaster) kbMaster.gain.value = (kb.volume/100) * 0.9;
+  keberoSave();
+});
+function kbSetSteps(n){
+  n = Math.max(2, Math.min(50, Math.round(+n || 8)));
+  kb.steps = n; kb.preset = '';
+  if(kbStepIdx >= kb.steps) kbStepIdx = 0;
+  keberoSave(); kbRenderGrid(); kbRenderPresets();
+}
+document.getElementById('kbSteps').addEventListener('change', (e)=>kbSetSteps(e.target.value));
+document.getElementById('kbStepsDown').addEventListener('click', ()=>kbSetSteps(kb.steps-1));
+document.getElementById('kbStepsUp').addEventListener('click', ()=>kbSetSteps(kb.steps+1));
+document.getElementById('kbSpb').addEventListener('change', (e)=>{
+  kb.spb = +e.target.value || 2; kb.preset = '';
+  keberoSave(); kbRenderGrid(); kbRenderPresets();
+});
+document.querySelectorAll('[data-kbbrush]').forEach(b=>b.addEventListener('click', ()=>{
+  kbBrush = +b.dataset.kbbrush;
+  if(kbBrush) kbPlayValue(kbBrush, kbAudio().currentTime + 0.005, 0.9);
+  document.querySelectorAll('[data-kbbrush]').forEach(x=>x.classList.toggle('on', x===b));
+}));
+document.getElementById('kbTapBtn').addEventListener('click', ()=>{
+  const now = performance.now();
+  kbTaps = kbTaps.filter(t => now - t < 7000); // allows slow tempos down to ~10 BPM
+  kbTaps.push(now);
+  kbHit('tak', undefined, 0.6);
+  if(kbTaps.length >= 2){
+    const iv = []; for(let i=1;i<kbTaps.length;i++) iv.push(kbTaps[i]-kbTaps[i-1]);
+    const recent = iv.slice(-4);
+    kbSetBpm(60000 / (recent.reduce((a,b)=>a+b,0) / recent.length));
+    kb.preset = ''; kbRenderPresets();
+  } else {
+    toast('Keep tapping on the beat…');
+  }
+});
+document.getElementById('kbClearBtn').addEventListener('click', ()=>{
+  kb.pattern = new Array(kb.steps).fill(0); kb.preset = '';
+  keberoSave(); kbRenderGrid(); kbRenderPresets();
+});
+document.getElementById('kbSaveBtn').addEventListener('click', ()=>{
+  const name = (prompt('Name this pattern (e.g. the hymn or your teacher’s style):', kb.preset && !KB_PRESETS.some(p=>p.name===kb.preset) ? kb.preset : '') || '').trim();
+  if(!name) return;
+  if(KB_PRESETS.some(p=>p.name===name)){ toast('That name is used by a built-in preset'); return; }
+  kb.custom = (kb.custom||[]).filter(c=>c.name !== name);
+  kb.custom.push({name, bpm:kb.bpm, steps:kb.steps, spb:kb.spb||2, pattern:kb.pattern.slice()});
+  kb.preset = name;
+  keberoSave(); kbRenderPresets(); toast('Pattern saved');
+});
+
+/* ---------- live pads + pattern recording ---------- */
+function kbPad(kind){
+  const now = performance.now();
+  kbHit(kind);
+  const el = document.getElementById(kind === 'dum' ? 'kbPadDum' : kind === 'tak' ? 'kbPadTak' : 'kbPadTs');
+  el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'), 90);
+  if(kbRec){
+    if(kbRec.start === null){
+      kbRec.start = now;
+      kbRec.len = kb.steps * kbStepDur() * 1000;
+      kbRec.timer = setTimeout(kbFinishRecording, kbRec.len - kbStepDur()*500);
+      kbRec.raf = requestAnimationFrame(kbRecTick);
+      document.getElementById('kbRecMsg').textContent = 'Recording… keep drumming until the bar fills.';
+    }
+    kbRec.hits.push({t: now - kbRec.start, kind});
+  }
+}
+function kbRecTick(){
+  if(!kbRec || kbRec.start === null) return;
+  const f = Math.min(1, (performance.now() - kbRec.start) / kbRec.len);
+  document.getElementById('kbRecProgress').style.width = (f*100) + '%';
+  kbRec.raf = requestAnimationFrame(kbRecTick);
+}
+function kbFinishRecording(){
+  if(!kbRec) return;
+  cancelAnimationFrame(kbRec.raf); clearTimeout(kbRec.timer);
+  const stepMs = kbStepDur() * 1000;
+  const slots = Array.from({length:kb.steps}, ()=>({dum:false, tak:false, ts:false}));
+  let used = 0;
+  for(const h of kbRec.hits){
+    const i = Math.round(h.t / stepMs);
+    if(i >= kb.steps) continue;
+    slots[i][h.kind] = true;
+    used++;
+  }
+  // a dum wins over a tak on the same step; tsenatsil combines with either
+  const pat = slots.map(s=> s.dum ? (s.ts ? 3 : 1) : s.tak ? (s.ts ? 4 : 2) : s.ts ? 5 : 0);
+  kbRec = null;
+  document.getElementById('kbRecBtn').textContent = '⏺ Record a pattern';
+  document.getElementById('kbRecProgress').style.width = '0';
+  if(!used){ document.getElementById('kbRecMsg').textContent = 'Nothing recorded.'; return; }
+  kb.pattern = pat; kb.preset = '';
+  keberoSave(); kbRenderGrid(); kbRenderPresets();
+  document.getElementById('kbRecMsg').textContent = 'Done — your pattern is in the grid (snapped to the nearest step). Tap boxes to fix any step, or press ▶ to hear it loop.';
+}
+document.getElementById('kbRecBtn').addEventListener('click', ()=>{
+  if(kbRec){ // cancel / finish early
+    if(kbRec.start === null){ kbRec = null; document.getElementById('kbRecBtn').textContent = '⏺ Record a pattern'; document.getElementById('kbRecMsg').textContent = 'Recording cancelled.'; }
+    else kbFinishRecording();
+    return;
+  }
+  kbAudio();
+  kbRec = {start:null, hits:[], len:0, timer:0, raf:0};
+  document.getElementById('kbRecBtn').textContent = '■ Stop recording';
+  document.getElementById('kbRecMsg').textContent = `Ready — start drumming on the pads. One round = ${kb.steps} steps at ${kb.bpm} BPM.`;
+});
+['dum','tak','ts'].forEach(kind=>{
+  const el = document.getElementById(kind === 'dum' ? 'kbPadDum' : kind === 'tak' ? 'kbPadTak' : 'kbPadTs');
+  el.addEventListener('pointerdown', (e)=>{ e.preventDefault(); kbPad(kind); });
+});
+document.addEventListener('keydown', (e)=>{
+  if(!document.getElementById('screen-kebero').classList.contains('active')) return;
+  if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(e.repeat) return;
+  const k = e.key.toLowerCase();
+  if(k === 'd' || k === 'f'){ kbPad('dum'); e.preventDefault(); }
+  else if(k === 'k' || k === 'j'){ kbPad('tak'); e.preventDefault(); }
+  else if(k === 'l' || k === 's'){ kbPad('ts'); e.preventDefault(); }
+  else if(k === ' '){ kbPlaying ? keberoStop() : keberoStart(); e.preventDefault(); }
+});
+
+/* ---------- your own kebero sounds ---------- */
+async function kbDecodeHit(blob){
+  const ctx = kbAudio();
+  const ab = await blob.arrayBuffer();
+  const buf = await new Promise((res, rej)=>{
+    const p = ctx.decodeAudioData(ab, res, rej);
+    if(p && p.then) p.then(res, rej);
+  });
+  // trim the silence before the hit and keep ~1.2 s, then normalise
+  const ch = buf.getChannelData(0);
+  let peak = 0; for(let i=0;i<ch.length;i++){ const a = Math.abs(ch[i]); if(a > peak) peak = a; }
+  if(peak < 0.01) throw new Error('recording is silent');
+  let start = 0; while(start < ch.length && Math.abs(ch[start]) < peak*0.12) start++;
+  start = Math.max(0, start - Math.floor(buf.sampleRate*0.004));
+  const len = Math.min(ch.length - start, Math.floor(buf.sampleRate*1.2));
+  const out = ctx.createBuffer(1, len, buf.sampleRate);
+  const o = out.getChannelData(0);
+  const fade = Math.floor(buf.sampleRate*0.08);
+  for(let i=0;i<len;i++){
+    let v = ch[start+i] / peak * 0.95;
+    if(i > len - fade) v *= (len - i) / fade;
+    o[i] = v;
+  }
+  return out;
+}
+async function kbStoreHit(kind, blob){
+  try{
+    kbBuffers[kind] = await kbDecodeHit(blob);
+    await dbPut('media', {id:'kebero-'+kind, blob});
+    kb.soundMode = 'custom'; keberoSave();
+    kbRenderSound();
+    kbHit(kind);
+    toast(KB_SOUND_NAME[kind] + ' sound saved');
+  }catch(e){
+    toast('Could not use that sound: ' + (e && e.message ? e.message : 'unreadable'));
+  }
+}
+let kbFileKind = 'dum';
+document.querySelectorAll('[data-kbfile]').forEach(b=>b.addEventListener('click', ()=>{
+  kbFileKind = b.dataset.kbfile; document.getElementById('kbFileInput').click();
+}));
+document.getElementById('kbFileInput').addEventListener('change', (e)=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(f) kbStoreHit(kbFileKind, f);
+});
+document.querySelectorAll('[data-kbtest]').forEach(b=>b.addEventListener('click', ()=>kbHit(b.dataset.kbtest)));
+document.querySelectorAll('[data-kbreset]').forEach(b=>b.addEventListener('click', async ()=>{
+  const kind = b.dataset.kbreset;
+  if(!kbBuffers[kind]) return;
+  if(!confirm('Remove your recorded ' + KB_SOUND_NAME[kind] + ' sound?')) return;
+  kbBuffers[kind] = null;
+  await dbDelete('media', 'kebero-'+kind).catch(()=>{});
+  kbRenderSound();
+}));
+document.querySelectorAll('[data-kbrec]').forEach(b=>b.addEventListener('click', async ()=>{
+  const kind = b.dataset.kbrec;
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)){
+    toast('Recording isn’t available here — use 📁 File instead'); return;
+  }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}}); }
+  catch(e){ toast('Microphone permission is needed to record'); return; }
+  const chunks = [];
+  const mr = new MediaRecorder(stream);
+  mr.ondataavailable = ev=>{ if(ev.data && ev.data.size) chunks.push(ev.data); };
+  mr.onstop = ()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    b.textContent = '🎙 Record';
+    const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+    kbStoreHit(kind, blob);
+  };
+  mr.start();
+  b.textContent = '● Hit now…';
+  document.getElementById('kbStatus-'+kind).textContent = kind === 'ts' ? 'Listening — shake the tsenatsil once' : 'Listening — hit the ' + (kind === 'dum' ? 'big' : 'small') + ' side once';
+  setTimeout(()=>{ if(mr.state !== 'inactive') mr.stop(); }, 2000);
+}));
+document.getElementById('kbSoundBuiltin').addEventListener('click', ()=>{ kb.soundMode = 'builtin'; keberoSave(); kbRenderSound(); });
+document.getElementById('kbSoundCustom').addEventListener('click', ()=>{
+  kb.soundMode = 'custom'; keberoSave(); kbRenderSound();
+  if(!kbBuffers.dum && !kbBuffers.tak && !kbBuffers.ts) toast('Record or choose your sounds below');
+});
+
+/* ============================================================
+   APPEARANCE — theme buttons plus a faint background picture per
+   celebration. The picture follows the loaded hymn's celebration
+   (or the last-played hymn at start-up); a celebration with no
+   picture keeps the plain theme background.
+   ============================================================ */
+let appearance = {enabled:true, opLight:8, opDark:10, size:'fit', gray:false, cel:{}};
+let appearanceReady = false;
+let bgLastPlayedId = null;
+let bgApplyToken = 0;
+let bgPickFor = null;
+function celKey(name){ return String(name||'').trim().toLowerCase(); }
+
+async function loadAppearance(){
+  try{
+    const rec = await dbGet('meta','appearance');
+    if(rec && rec.value){
+      const v = rec.value;
+      appearance = Object.assign(appearance, {opLight:v.opLight, opDark:v.opDark, size:v.size, gray:v.gray});
+      if(v.enabled !== undefined) appearance.enabled = v.enabled;
+      appearance.cel = v.cel || {};
+      ['opLight','opDark'].forEach(k=>{ if(typeof appearance[k] !== 'number') appearance[k] = k==='opLight' ? 8 : 10; });
+      if(!appearance.size) appearance.size = 'fit';
+    }
+    const lp = await dbGet('meta','lastPlayed');
+    if(lp && lp.hymnId) bgLastPlayedId = lp.hymnId;
+  }catch(e){}
+  appearanceReady = true;
+  renderAppearance();
+  applyAppBackground();
+}
+function saveAppearance(){ dbPut('meta', {key:'appearance', value:appearance}).catch(()=>{}); }
+
+function bgActiveCelebration(){
+  const id = currentHymn ? currentHymn.id : bgLastPlayedId;
+  if(!id) return '';
+  const h = hymns.find(x=>x.id===id) || currentHymn;
+  return (h && h.celebration) || '';
+}
+async function applyAppBackground(){
+  const el = document.getElementById('appBg');
+  if(!el || !appearanceReady) return;
+  const token = ++bgApplyToken;
+  const dark = document.body.classList.contains('dark');
+  const entry = appearance.enabled ? appearance.cel[celKey(bgActiveCelebration())] : null;
+  const pct = dark ? appearance.opDark : appearance.opLight;
+  const src = entry ? await urlFor(entry.mediaId) : null;
+  if(token !== bgApplyToken) return; // a newer call already ran
+  if(!src || !pct){
+    el.style.opacity = 0; el.style.backgroundImage = 'none';
+    document.body.classList.remove('has-bg');
+    return;
+  }
+  el.style.backgroundImage = `url("${src}")`;
+  el.style.backgroundSize = appearance.size === 'fill' ? 'cover' : 'min(88vw, 460px) auto';
+  el.style.filter = appearance.gray ? 'grayscale(1)' : 'none';
+  el.style.opacity = String(pct / 100);
+  document.body.classList.add('has-bg');
+}
+
+function allCelebrationNames(){
+  const seen = new Map();
+  const add = n=>{ const k = celKey(n); if(k && !seen.has(k)) seen.set(k, String(n).trim()); };
+  CELEBRATION_SUGGESTIONS.forEach(add);
+  hymns.forEach(h=>add(h.celebration));
+  Object.values(appearance.cel).forEach(e=>add(e.name));
+  return Array.from(seen.values());
+}
+async function renderCelebrationBgList(){
+  const wrap = document.getElementById('celBgList');
+  const names = allCelebrationNames();
+  const setCount = names.filter(n=>appearance.cel[celKey(n)]).length;
+  document.getElementById('celBgSummary').textContent = `Pictures for celebrations (${setCount} set)`;
+  const rows = [];
+  for(const n of names){
+    const e = appearance.cel[celKey(n)];
+    const url = e ? await urlFor(e.mediaId) : null;
+    rows.push(`<div class="cel-bg-row">
+      <div class="th ${url?'set':''}" style="${url?`background-image:url('${url}')`:''}"></div>
+      <div class="nm">${escapeHtml(n)}</div>
+      <button class="btn ghost" data-celpick="${escapeHtml(n)}" style="padding:6px 10px;">${url?'Change':'Add'}</button>
+      ${url?`<button class="btn ghost" data-celdel="${escapeHtml(n)}" style="padding:6px 10px;">✕</button>`:''}
+    </div>`);
+  }
+  wrap.innerHTML = rows.join('');
+  wrap.querySelectorAll('[data-celpick]').forEach(b=>b.addEventListener('click', ()=>{
+    bgPickFor = b.dataset.celpick;
+    document.getElementById('bgFileInput').click();
+  }));
+  wrap.querySelectorAll('[data-celdel]').forEach(b=>b.addEventListener('click', async ()=>{
+    const k = celKey(b.dataset.celdel);
+    const e = appearance.cel[k];
+    if(!e) return;
+    delete appearance.cel[k];
+    saveAppearance();
+    await dbDelete('media', e.mediaId).catch(()=>{});
+    renderCelebrationBgList(); applyAppBackground();
+  }));
+}
+function renderAppearance(){
+  const dark = document.body.classList.contains('dark');
+  document.getElementById('themeLightBtn').className = 'btn ' + (dark ? 'ghost' : '');
+  document.getElementById('themeDarkBtn').className = 'btn ' + (dark ? '' : 'ghost');
+  document.getElementById('bgEnabled').checked = !!appearance.enabled;
+  document.getElementById('bgOptions').classList.toggle('hidden', !appearance.enabled);
+  document.getElementById('celBgDetails').classList.toggle('hidden', !appearance.enabled);
+  document.getElementById('bgOpLight').value = appearance.opLight;
+  document.getElementById('bgOpDark').value = appearance.opDark;
+  document.getElementById('bgOpLightVal').textContent = appearance.opLight + '%';
+  document.getElementById('bgOpDarkVal').textContent = appearance.opDark + '%';
+  document.getElementById('bgSize').value = appearance.size;
+  document.getElementById('bgGray').checked = !!appearance.gray;
+  if(appearanceReady) renderCelebrationBgList();
+}
+async function setTheme(dark){
+  applyDarkMode(dark);
+  await dbPut('meta', {key:'darkMode', value:dark});
+}
+document.getElementById('themeLightBtn').addEventListener('click', ()=>setTheme(false));
+document.getElementById('themeDarkBtn').addEventListener('click', ()=>setTheme(true));
+document.getElementById('bgEnabled').addEventListener('change', (e)=>{
+  appearance.enabled = e.target.checked; saveAppearance(); renderAppearance(); applyAppBackground();
+});
+document.getElementById('bgFileInput').addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f || !bgPickFor) return;
+  try{
+    const blob = await shrinkImage(f, 1400); // keep backgrounds light
+    const k = celKey(bgPickFor);
+    const old = appearance.cel[k];
+    const mediaId = 'bg-cel-' + uid();
+    await dbPut('media', {id:mediaId, blob});
+    appearance.cel[k] = {name:bgPickFor, mediaId};
+    saveAppearance();
+    if(old) dbDelete('media', old.mediaId).catch(()=>{});
+    renderCelebrationBgList(); applyAppBackground();
+    toast('Picture set for ' + bgPickFor);
+  }catch(err){ toast('Could not use that picture'); }
+  bgPickFor = null;
+});
+function shrinkImage(file, maxSide){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      const sc = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth*sc); c.height = Math.round(img.naturalHeight*sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=> b ? res(b) : rej(new Error('encode')), 'image/jpeg', 0.85);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('load')); };
+    img.src = url;
+  });
+}
+['bgOpLight','bgOpDark'].forEach(id=>document.getElementById(id).addEventListener('input', (e)=>{
+  appearance[id === 'bgOpLight' ? 'opLight' : 'opDark'] = +e.target.value;
+  document.getElementById(id+'Val').textContent = e.target.value + '%';
+  const wantDark = id === 'bgOpDark'; // preview in the matching theme while dragging
+  if(document.body.classList.contains('dark') !== wantDark) applyDarkMode(wantDark);
+  applyAppBackground(); saveAppearance();
+}));
+['bgOpLight','bgOpDark'].forEach(id=>document.getElementById(id).addEventListener('change', ()=>{
+  dbPut('meta', {key:'darkMode', value:document.body.classList.contains('dark')}).catch(()=>{});
+}));
+document.getElementById('bgSize').addEventListener('change', (e)=>{ appearance.size = e.target.value; saveAppearance(); applyAppBackground(); });
+document.getElementById('bgGray').addEventListener('change', (e)=>{ appearance.gray = e.target.checked; saveAppearance(); applyAppBackground(); });
+document.getElementById('celBgDetails').addEventListener('toggle', ()=>{ if(document.getElementById('celBgDetails').open) renderCelebrationBgList(); });
+
 async function init(){
   await openDB();
   await loadDarkModePref();
+  await loadAppearance();
   await loadHymns();
   renderHome();
   renderLibrary();
