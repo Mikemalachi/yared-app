@@ -50,7 +50,7 @@ the row and paste it into another house's tab — the app follows on the next sy
 
 * Add a hymn from the sheet by typing a new row with at least a title — an id is filled in automatically.
 * Don't delete rows in the sheet; tick **deleted** instead (a missing row is simply put back from the phone).
-* Audio stored only on the phone is not uploaded; add a link in **audioLink** if you want it in the sheet.
+* Audio stored on a device is uploaded to Drive only if you switch on **Upload my audio files to Drive** in the app's sync card (up to 20 MB per file, Wi-Fi only by default). Its Drive link then appears in **audioLink**, so other devices can play it.
 * The app syncs automatically when opened (and when you return to it after 15+ minutes) if "Auto-sync" is on.
 
 ## If you edit Code.gs later

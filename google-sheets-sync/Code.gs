@@ -183,7 +183,7 @@ function doPost(e){
   lock.waitLock(30000);
   try{
     if(body.action === 'upsert') return json_(upsert_(body.rows || []));
-    if(body.action === 'uploadImage') return json_(uploadImage_(body));
+    if(body.action === 'uploadImage' || body.action === 'uploadAudio') return json_(uploadImage_(body));
     if(body.action === 'delete') return json_(markDeleted_(body.ids || []));
     if(body.action === 'celebrations') return json_(upsertCel_(body.rows || []));
     return json_({ok:false, error:'Unknown action'});
@@ -385,7 +385,8 @@ function refreshPreviews(){
   });
 }
 
-// Lyric images go into Drive folders that mirror the hymn's house/folder path.
+// Lyric images (and, when switched on in the app, audio files) go into Drive
+// folders that mirror the hymn's house/folder path.
 function uploadImage_(b){
   if(!b.data) return {ok:false, error:'No image data'};
   const bytes = Utilities.base64Decode(b.data);
