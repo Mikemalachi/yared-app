@@ -89,7 +89,7 @@
   main{flex:1; padding:0 16px 170px; overflow-y:auto;}
 
   /* Screens */
-  .screen{display:none;}
+  .screen:not(.active){display:none !important;}
   .screen.active{display:block; animation:fade .18s ease;}
   @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
 
@@ -262,12 +262,12 @@
   .cel-bg-row .nm{flex:1; font-size:13px;}
   /* ---- landscape / PC: lyrics on one side, controls and panes on the other ---- */
   @media (min-width:900px) and (min-height:520px), (min-width:720px) and (min-height:520px) and (orientation:landscape){
-    #screen-player{
+    #screen-player.active{
       display:grid; grid-template-columns:minmax(360px, 1.15fr) minmax(300px, .85fr);
       gap:26px; align-items:start; max-width:1240px; margin:0 auto;
     }
-    #screen-player > *{grid-column:2; min-width:0;}
-    #screen-player > .player-sticky-top{
+    #screen-player.active > *{grid-column:2; min-width:0;}
+    #screen-player.active > .player-sticky-top{
       grid-column:1; grid-row:1 / span 60; position:sticky; top:8px;
       max-width:none; margin:0; padding:0; box-shadow:none;
     }
@@ -276,7 +276,7 @@
     #screen-player #playerStickySpacer{display:none;}
     #screen-player .lo-actions #pinToggleBtn{display:none;}
     /* full-screen focus still takes over the whole window */
-    #screen-player.focus-mode > .player-sticky-top{position:fixed; grid-row:auto; top:0; bottom:0; max-width:980px;}
+    #screen-player.active.focus-mode > .player-sticky-top{position:fixed; grid-row:auto; top:0; bottom:0; max-width:980px;}
   }
 
   /* ---- wide screens (PC): use the space instead of a phone-width column ---- */
@@ -4652,6 +4652,7 @@ async function loadHymnIntoPlayer(hymnId, queueIds){
   document.getElementById('teacherBeginningVal').textContent='';
 
   currentHymn = h;
+  playbackStarted = false;   // a freshly opened hymn hasn't played yet, so no mini player
   if(typeof applyAppBackground==='function') applyAppBackground();
   { const tune = document.getElementById('autoSuggestTune'); if(tune) tune.style.display='none'; }
   currentQueue = queueIds && queueIds.length ? queueIds : [hymnId];
@@ -4810,7 +4811,7 @@ playPauseBtn.addEventListener('click', ()=>{
   if(!audio.src){ toast('No audio attached to this hymn'); return; }
   if(audio.paused) audio.play(); else audio.pause();
 });
-audio.addEventListener('play', ()=>{ playPauseBtn.textContent='❚❚'; document.getElementById('miniPlayPause').textContent='❚❚'; nativeNotifyUpdate(); if(typeof updateMiniPlayer==='function') updateMiniPlayer(); });
+audio.addEventListener('play', ()=>{ playPauseBtn.textContent='❚❚'; document.getElementById('miniPlayPause').textContent='❚❚'; nativeNotifyUpdate(); playbackStarted = true; if(typeof updateMiniPlayer==='function') updateMiniPlayer(); });
 audio.addEventListener('pause', ()=>{ playPauseBtn.textContent='▶'; document.getElementById('miniPlayPause').textContent='▶'; nativeNotifyUpdate(); if(typeof updateMiniPlayer==='function') updateMiniPlayer(); });
 audio.addEventListener('loadedmetadata', async ()=>{
   updatePlaybackUI();
@@ -5033,11 +5034,12 @@ function setMiniSeekPct(pct){
   document.getElementById('miniSeekFill').style.width = (pct*100)+'%';
   document.getElementById('miniSeekHandle').style.left = (pct*100)+'%';
 }
+var playbackStarted = false;   // set by the audio 'play' event, cleared when another hymn is loaded
 function updateMiniPlayer(){
   const onPlayerScreen = document.getElementById('screen-player').classList.contains('active');
-  // only once playback has actually started — otherwise the player belongs on its own screen
-  const playing = !!audio.src && (!audio.paused || audio.currentTime > 0.1);
-  if(!currentHymn || onPlayerScreen || !playing){
+  // only after playback has actually been started on this hymn — opening a hymn restores its
+  // saved position, so the time alone is not proof that anything has played
+  if(!currentHymn || onPlayerScreen || !playbackStarted){
     miniPlayer.classList.add('hidden');
     return;
   }
