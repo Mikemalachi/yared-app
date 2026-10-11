@@ -264,13 +264,23 @@
   @media (min-width:900px) and (min-height:520px), (min-width:720px) and (min-height:520px) and (orientation:landscape){
     #screen-player.active{
       display:grid; grid-template-columns:minmax(360px, 1.15fr) minmax(300px, .85fr);
-      gap:26px; align-items:start; max-width:1240px; margin:0 auto;
+      column-gap:26px; row-gap:0; align-items:start; max-width:1240px; margin:0 auto;
     }
     #screen-player.active > *{grid-column:2; min-width:0;}
+    #screen-player.active > *:not(.player-sticky-top){margin-bottom:12px;}
+    /* the window is what actually scrolls, so <main> must not be the scrollport
+       that position:sticky measures against — otherwise the lyrics scroll away */
+    main{overflow:visible;}
     #screen-player.active > .player-sticky-top{
       grid-column:1; grid-row:1 / span 60; position:sticky; top:8px;
       max-width:none; margin:0; padding:0; box-shadow:none;
+      max-height:calc(100vh - 18px - var(--navh, 84px)); overflow:auto;
     }
+    /* the nav-bar clearance lives inside the grid (as a last row in the right column), not in
+       <main>'s padding: sticky only travels inside its own grid area, so padding below it would
+       let the lyrics scroll away over the last 200px, and a short page would scroll for nothing */
+    body:has(#screen-player.active) main{padding-bottom:0;}
+    #screen-player.active::after{content:''; grid-column:2; height:calc(var(--navh, 84px) + 16px);}
     /* pinning is pointless here — the lyrics never scroll away */
     #screen-player .player-sticky-top.pinned{position:sticky; left:auto; right:auto; max-width:none; box-shadow:none;}
     #screen-player #playerStickySpacer{display:none;}
@@ -353,6 +363,49 @@
   .map-svg .pulse{fill:rgba(242,206,124,.45); animation:mapPulse 1.8s ease-out infinite;}
   @keyframes mapPulse{0%{r:30; opacity:.75;} 70%{r:46; opacity:0;} 100%{r:46; opacity:0;}}
   body.dark .map-wrap{filter:brightness(.82) saturate(.9);}
+  /* the little pilgrim who walks the trail as hymns are covered */
+  .map-svg .walker .wk-body{animation:wkBob 2.6s ease-in-out infinite;}
+  .map-svg .walker .wk-leg{transform-origin:center top;}
+  .map-svg .walker.walking .wk-leg.l{animation:wkLeg .34s linear infinite;}
+  .map-svg .walker.walking .wk-leg.r{animation:wkLeg .34s linear infinite reverse;}
+  .map-svg .walker.walking .wk-body{animation:wkBob .34s ease-in-out infinite;}
+  @keyframes wkLeg{0%{transform:rotate(18deg)} 50%{transform:rotate(-18deg)} 100%{transform:rotate(18deg)}}
+  @keyframes wkBob{0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.6px)}}
+
+  /* ---- course player: playing from a course keeps the map on screen ---- */
+  .course-player{
+    position:fixed; left:10px; right:10px; bottom:calc(var(--navh, 74px) + 8px); z-index:29;
+    margin:0 auto; max-width:520px; background:var(--surface);
+    border:1px solid var(--line); border-radius:16px; padding:10px 13px 12px;
+    box-shadow:0 12px 26px -14px rgba(43,33,24,.55);
+  }
+  .course-player.hidden{display:none;}
+  .cp-head{display:flex; align-items:center; gap:8px;}
+  .cp-head .cp-t{flex:1; min-width:0; font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cp-head .cp-x{background:none; border:none; font-size:17px; line-height:1; color:var(--ink-soft);}
+  .cp-stars{font-size:12px; margin-top:2px;}
+  .cp-seek{height:22px; display:flex; align-items:center; cursor:pointer; touch-action:none;}
+  .cp-track{width:100%; height:5px; border-radius:3px; background:var(--parchment-dim); position:relative;}
+  .cp-track i{position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:3px; background:var(--gold);}
+  .cp-times{display:flex; justify-content:space-between; font-size:11px; color:var(--ink-soft);}
+  .cp-transport{display:flex; align-items:center; justify-content:center; gap:18px; margin:4px 0 2px;}
+  .cp-transport button{background:none; border:none; font-size:18px; color:var(--ink);}
+  .cp-transport .cp-play{width:44px; height:44px; border-radius:50%; background:var(--gold); color:#fff; font-size:16px;}
+  .cp-status{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:6px;}
+  .cp-status button{font-size:11px; padding:5px 10px; border-radius:999px; border:1px solid var(--line);
+    background:var(--parchment-dim); color:var(--ink);}
+  .cp-status button.on{color:#fff; border-color:transparent;}
+  .cp-row{display:flex; gap:8px; margin-top:8px;}
+  .cp-row .btn{flex:1; padding:7px 10px; font-size:12.5px;}
+  #screen-course.has-player{padding-bottom:280px;}
+  /* on a PC or a landscape tablet the player sits beside the map instead of over it */
+  @media (min-width:900px) and (min-height:520px), (min-width:720px) and (min-height:520px) and (orientation:landscape){
+    .course-player{
+      left:auto; right:20px; top:78px; bottom:auto; width:330px; max-width:330px; margin:0;
+      max-height:calc(100vh - 110px); overflow:auto;
+    }
+    #screen-course.has-player{padding-bottom:40px; margin:0 374px 0 auto;}
+  }
 
   /* game-mode trail */
   .trail{position:relative; padding-left:8px;}
@@ -1559,6 +1612,26 @@
     </div>
   </div>
 
+  <!-- played from a course: stays on the map instead of leaving for the Player screen -->
+  <div class="course-player hidden" id="coursePlayer">
+    <div class="cp-head">
+      <div class="cp-t" id="cpTitle">—</div>
+      <button class="cp-x" id="cpClose" title="Close">✕</button>
+    </div>
+    <div class="cp-stars" id="cpStars"></div>
+    <div class="cp-seek" id="cpSeek"><div class="cp-track"><i id="cpFill"></i></div></div>
+    <div class="cp-times"><span id="cpCur">0:00</span><span id="cpDur">0:00</span></div>
+    <div class="cp-transport">
+      <button id="cpPrev" title="Previous hymn in this course">⏮</button>
+      <button class="cp-play" id="cpPlay">▶</button>
+      <button id="cpNext" title="Next hymn in this course">⏭</button>
+    </div>
+    <div class="cp-status" id="cpStatus"></div>
+    <div class="cp-row">
+      <button class="btn secondary" id="cpFull">⛶ Full player</button>
+    </div>
+  </div>
+
   <nav class="tabbar">
     <button data-screen="home" class="active"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Home</button>
     <button data-screen="library"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16"/><path d="M9 7h7"/></svg>Library</button>
@@ -2642,6 +2715,7 @@ function showScreen(name){
   if(name==='player' && typeof positionPinnedBlock==='function'){
     requestAnimationFrame(()=>{ if(typeof applyLyricHeight==='function') applyLyricHeight(); positionPinnedBlock(); });
   }
+  if(typeof syncCoursePlayer==='function') syncCoursePlayer();
   if(typeof updateMiniPlayer==='function') updateMiniPlayer();
 }
 document.getElementById('queueSummaryCard').addEventListener('click', ()=>showScreen('queue'));
@@ -3985,6 +4059,10 @@ async function setMemorizationStatus(hymnId, statusKey){
   if(currentHymn && currentHymn.id===hymnId) currentHymn = h;
   await logPracticeEvent();
   renderStatusRow();
+  if(typeof renderCoursePlayer === 'function') renderCoursePlayer();
+  if(document.getElementById('screen-course').classList.contains('active') && typeof renderCourseScreen === 'function'){
+    renderCourseScreen();
+  }
   toast(def.label+' — next review in '+def.days+' day(s)');
   // game mode: moving a hymn up the star ladder earns XP, and may finish a course.
   // Runs after the status toast so its own message isn't wiped out straight away.
@@ -4811,8 +4889,8 @@ playPauseBtn.addEventListener('click', ()=>{
   if(!audio.src){ toast('No audio attached to this hymn'); return; }
   if(audio.paused) audio.play(); else audio.pause();
 });
-audio.addEventListener('play', ()=>{ playPauseBtn.textContent='❚❚'; document.getElementById('miniPlayPause').textContent='❚❚'; nativeNotifyUpdate(); playbackStarted = true; if(typeof updateMiniPlayer==='function') updateMiniPlayer(); });
-audio.addEventListener('pause', ()=>{ playPauseBtn.textContent='▶'; document.getElementById('miniPlayPause').textContent='▶'; nativeNotifyUpdate(); if(typeof updateMiniPlayer==='function') updateMiniPlayer(); });
+audio.addEventListener('play', ()=>{ playPauseBtn.textContent='❚❚'; document.getElementById('miniPlayPause').textContent='❚❚'; nativeNotifyUpdate(); playbackStarted = true; if(typeof updateMiniPlayer==='function') updateMiniPlayer(); if(typeof updateCoursePlayer==='function') updateCoursePlayer(); });
+audio.addEventListener('pause', ()=>{ playPauseBtn.textContent='▶'; document.getElementById('miniPlayPause').textContent='▶'; nativeNotifyUpdate(); if(typeof updateMiniPlayer==='function') updateMiniPlayer(); if(typeof updateCoursePlayer==='function') updateCoursePlayer(); });
 audio.addEventListener('loadedmetadata', async ()=>{
   updatePlaybackUI();
   if(currentHymn && (!currentHymn.duration || currentHymn.duration===0)){
@@ -4830,6 +4908,7 @@ audio.addEventListener('timeupdate', ()=>{
     setMiniSeekPct(audio.currentTime/audio.duration);
   }
   if(typeof updatePhraseMapProgress==='function') updatePhraseMapProgress();
+  if(typeof updateCoursePlayer==='function') updateCoursePlayer();
 });
 audio.addEventListener('ended', onAudioEnded);
 
@@ -4937,8 +5016,10 @@ const pinnedSpacer = document.getElementById('playerStickySpacer');
 const splitPlayerMQ = window.matchMedia('(min-width:900px) and (min-height:520px), (min-width:720px) and (min-height:520px) and (orientation:landscape)');
 function isSplitPlayer(){ return splitPlayerMQ.matches; }
 splitPlayerMQ.addEventListener('change', ()=>{
+  if(splitPlayerMQ.matches) pinnedEl.classList.remove('compact');
   if(typeof applyLyricHeight === 'function') applyLyricHeight();
   positionPinnedBlock();
+  if(typeof updateCompactLyrics === 'function') updateCompactLyrics();
 });
 function positionPinnedBlock(){
   if(!focusMode && isSplitPlayer()){
@@ -4996,7 +5077,7 @@ function updateCompactLyrics(){
   if(!lyricsPinned) return;
   if(!document.getElementById('screen-player').classList.contains('active')) return;
   const y = Math.max(playerMain.scrollTop || 0, window.scrollY || document.documentElement.scrollTop || 0);
-  const isCompact = y > 24;
+  const isCompact = y > 24 && !isSplitPlayer();   // PC/landscape has room: the lyrics stay full size
   if(pinnedEl.classList.contains('compact') !== isCompact){
     pinnedEl.classList.toggle('compact', isCompact);
     positionPinnedBlock();
@@ -5005,6 +5086,100 @@ function updateCompactLyrics(){
 playerMain.addEventListener('scroll', updateCompactLyrics, {passive:true});
 window.addEventListener('scroll', updateCompactLyrics, {passive:true});
 window.addEventListener('resize', positionPinnedBlock);
+
+/* ============================================================
+   COURSE PLAYER — a hymn started from a course plays here, so the
+   map (and the pilgrim walking it) stays on screen: a dock above
+   the nav bar on a phone, a panel beside the map on a PC or tablet.
+   ============================================================ */
+const coursePlayerEl = document.getElementById('coursePlayer');
+let coursePlayerActive = false;
+function coursePlayerOpen(){ return coursePlayerActive && !coursePlayerEl.classList.contains('hidden'); }
+function syncNavHeight(){
+  const nav = document.querySelector('nav.tabbar');
+  if(nav) document.documentElement.style.setProperty('--navh', nav.offsetHeight + 'px');
+}
+window.addEventListener('resize', syncNavHeight);
+syncNavHeight();
+
+/* only ever visible on the course screen — never floating over the other tabs */
+function syncCoursePlayer(){
+  const onCourse = document.getElementById('screen-course').classList.contains('active');
+  const show = coursePlayerActive && onCourse;
+  coursePlayerEl.classList.toggle('hidden', !show);
+  document.getElementById('screen-course').classList.toggle('has-player', show);
+  if(show) renderCoursePlayer();
+}
+async function openCoursePlayer(hymnId, ids){
+  coursePlayerActive = true;
+  await loadHymnIntoPlayer(hymnId, ids);
+  syncCoursePlayer();
+  if(audio.src){ audio.play().catch(()=>{}); }
+  else toast('No audio attached to this hymn');
+  renderCoursePlayer();
+  requestAnimationFrame(scrollCourseToPlaying);
+}
+function closeCoursePlayer(){
+  coursePlayerActive = false;
+  if(!audio.paused) audio.pause();
+  syncCoursePlayer();
+  if(typeof updateMiniPlayer === 'function') updateMiniPlayer();
+}
+/* bring the waypoint being practised into view behind the dock */
+function scrollCourseToPlaying(){
+  if(!currentHymn) return;
+  const c = courses.find(x=>x.id===openCourseId); if(!c) return;
+  const i = (c.hymnIds||[]).filter(id=>hymns.some(h=>h.id===id)).indexOf(currentHymn.id);
+  const el = document.querySelectorAll('#courseBody .mapnode, #courseBody .course-row')[i];
+  if(el && el.scrollIntoView) el.scrollIntoView({block:'center', behavior:'smooth'});
+}
+function renderCoursePlayer(){
+  if(!coursePlayerOpen() || !currentHymn) return;
+  document.getElementById('cpTitle').textContent = currentHymn.title;
+  const c = courses.find(x=>x.id===openCourseId);
+  const stars = hymnStars(currentHymn);
+  document.getElementById('cpStars').innerHTML = starRow(stars, 13) +
+    (c ? `<span style="font-size:11px; color:var(--ink-soft); margin-left:7px;">${courseCovered(c, currentHymn) ? 'covered' : 'needs ' + (COVER_RULES[c.rule] || COVER_RULES.wellMemorized).label.toLowerCase()}</span>` : '');
+  const cur = (currentHymn.stats && currentHymn.stats.status) || 'new';
+  const row = document.getElementById('cpStatus');
+  row.innerHTML = '';
+  ['needsPractice','learning','wellMemorized'].forEach(key=>{
+    const def = STATUS_DEFS[key];
+    const b = document.createElement('button');
+    b.textContent = def.label;
+    if(cur === key){ b.classList.add('on'); b.style.background = def.color; }
+    b.addEventListener('click', ()=> setMemorizationStatus(currentHymn.id, key));
+    row.appendChild(b);
+  });
+  updateCoursePlayer();
+}
+function updateCoursePlayer(){
+  if(!coursePlayerOpen()) return;
+  document.getElementById('cpPlay').textContent = audio.paused ? '▶' : '❚❚';
+  const pct = audio.duration ? audio.currentTime / audio.duration : 0;
+  document.getElementById('cpFill').style.width = (pct*100) + '%';
+  document.getElementById('cpCur').textContent = fmtTime(audio.currentTime || 0);
+  document.getElementById('cpDur').textContent = audio.duration ? fmtTime(audio.duration) : '0:00';
+}
+document.getElementById('cpPlay').addEventListener('click', ()=>{
+  if(!audio.src){ toast('No audio attached to this hymn'); return; }
+  if(audio.paused) audio.play(); else audio.pause();
+});
+document.getElementById('cpNext').addEventListener('click', ()=>{ playNext(); setTimeout(()=>{ renderCoursePlayer(); scrollCourseToPlaying(); }, 260); });
+document.getElementById('cpPrev').addEventListener('click', ()=>{ playPrev(); setTimeout(()=>{ renderCoursePlayer(); scrollCourseToPlaying(); }, 260); });
+document.getElementById('cpClose').addEventListener('click', closeCoursePlayer);
+document.getElementById('cpFull').addEventListener('click', ()=>{ coursePlayerActive = false; syncCoursePlayer(); showScreen('player'); });
+(function(){
+  const strip = document.getElementById('cpSeek');
+  const seekTo = (clientX)=>{
+    if(!audio.duration) return;
+    const r = strip.getBoundingClientRect();
+    audio.currentTime = Math.max(0, Math.min(1, (clientX - r.left)/r.width)) * audio.duration;
+    updateCoursePlayer();
+  };
+  strip.addEventListener('pointerdown', (e)=>{ strip.setPointerCapture(e.pointerId); seekTo(e.clientX); });
+  strip.addEventListener('pointermove', (e)=>{ if(e.buttons > 0) seekTo(e.clientX); });
+})();
 
 function playNext(){
   if(!currentQueue.length) return;
@@ -5039,7 +5214,8 @@ function updateMiniPlayer(){
   const onPlayerScreen = document.getElementById('screen-player').classList.contains('active');
   // only after playback has actually been started on this hymn — opening a hymn restores its
   // saved position, so the time alone is not proof that anything has played
-  if(!currentHymn || onPlayerScreen || !playbackStarted){
+  const dockShowing = typeof coursePlayerOpen === 'function' && coursePlayerOpen();
+  if(!currentHymn || onPlayerScreen || !playbackStarted || dockShowing){
     miniPlayer.classList.add('hidden');
     return;
   }
@@ -7868,9 +8044,9 @@ function renderCourseMap(c, list){
     return {x: W/2 + t * (62 + rnd()*26), y: H - botPad - i * stepY, ...item};
   });
   // trail
-  let d = '';
+  let d = `M ${W/2} ${H - 30}`;
   pts.forEach((p, i)=>{
-    if(!i){ d = `M ${p.x} ${p.y}`; return; }
+    if(!i){ d += ` L ${p.x} ${p.y}`; return; }
     const prev = pts[i-1], mx = (prev.x + p.x)/2, my = (prev.y + p.y)/2;
     d += ` Q ${prev.x} ${my} ${mx} ${my} T ${p.x} ${p.y}`;
   });
@@ -7922,7 +8098,7 @@ function renderCourseMap(c, list){
       </defs>
       ${bg}
       ${scenery}
-      <path d="${d}" class="trail-road"/>
+      <path id="trailPath" d="${d}" class="trail-road"/>
       <path d="${d}" class="trail-dash"/>
       ${lastDone >= 0 ? `<path d="${d}" class="trail-done" style="stroke-dasharray:${(lastDone+1)/Math.max(1,n)*4000} 4000"/>` : ''}
       <g transform="translate(${W/2} ${H - 34})">
@@ -7936,8 +8112,78 @@ function renderCourseMap(c, list){
         <rect x="-7" y="10" width="14" height="24" rx="2" fill="#8A6A45"/>
       </g>
       ${nodes}
+      <g class="walker" id="mapWalker" transform="translate(${W/2} ${H - botPad})">
+        <g class="wk-body">
+          <ellipse cx="0" cy="5" rx="11" ry="3.6" fill="rgba(0,0,0,.2)"/>
+          <rect class="wk-leg l" x="-6" y="-9" width="4.6" height="11" rx="2.3" fill="#6B4A2F"/>
+          <rect class="wk-leg r" x="1.4" y="-9" width="4.6" height="11" rx="2.3" fill="#6B4A2F"/>
+          <rect x="9" y="-42" width="2.6" height="38" rx="1.3" fill="#8A6A45"/>
+          <path d="M10.3 -47 v8 M7 -44 h6.6" stroke="#B8862B" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M-10.5 -9 L-7.5 -29 L7.5 -29 L10.5 -9 Z" fill="#FBF7EC" stroke="#CBB88C" stroke-width="1"/>
+          <rect x="-10.8" y="-14" width="21.6" height="4.4" rx="1" fill="#B8862B"/>
+          <path d="M-7.5 -29 L7.5 -29 L6 -24 L-6 -24 Z" fill="#2B2118" opacity=".75"/>
+          <circle cx="0" cy="-34" r="6.2" fill="#8A5A3B"/>
+          <path d="M-6.6 -36.5 a6.6 5.4 0 0 1 13.2 0 z" fill="#FBF7EC" stroke="#CBB88C" stroke-width=".8"/>
+        </g>
+      </g>
     </svg>
   </div>`;
+}
+
+/* The walker is placed by measuring the trail itself, so it always sits on the
+   road whatever shape the course gives it. Covering a hymn makes it walk on. */
+function courseLastDone(c, list){
+  let last = -1;
+  list.forEach((item, i)=>{ if(courseCovered(c, item.h) && (i === 0 || last === i-1)) last = i; });
+  return last;
+}
+const walkerWas = {};          // course id -> the index the walker stood at last time
+let walkerAnim = null;
+function placeWalker(c, list){
+  const path = document.getElementById('trailPath');
+  const walker = document.getElementById('mapWalker');
+  if(!path || !walker || !list.length) return;
+  const total = path.getTotalLength();
+  if(!total){ return; }
+  // where each waypoint sits along the trail, measured off the drawn road itself
+  const coords = [...document.querySelectorAll('.map-svg .mapnode')].map(g=>{
+    const m = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(g.getAttribute('transform') || '');
+    return m ? {x:+m[1], y:+m[2]} : null;
+  });
+  const S = 260, samples = [];
+  for(let i=0;i<=S;i++){ const L = total*i/S, pt = path.getPointAtLength(L); samples.push({L, x:pt.x, y:pt.y}); }
+  const lenOf = (pt)=>{
+    let best = 0, bd = Infinity;
+    samples.forEach(sm=>{ const d = (sm.x-pt.x)*(sm.x-pt.x) + (sm.y-pt.y)*(sm.y-pt.y); if(d < bd){ bd = d; best = sm.L; } });
+    return best;
+  };
+  const stops = coords.map(pt=> pt ? lenOf(pt) : 0);
+  const at = (i)=> i < 0 ? 0 : (stops[Math.min(i, stops.length-1)] || 0);   // -1 = still at the camp
+  const now = courseLastDone(c, list);
+  const prev = (c.id in walkerWas) ? walkerWas[c.id] : now;
+  walkerWas[c.id] = now;
+  // stand beside the road rather than on top of the waypoint itself
+  const put = (len)=>{
+    const pt = path.getPointAtLength(Math.max(0, Math.min(total, len)));
+    walker.setAttribute('transform', `translate(${pt.x + 34} ${pt.y + 10})`);
+  };
+  if(walkerAnim){ cancelAnimationFrame(walkerAnim); walkerAnim = null; }
+  walker.classList.remove('walking');
+  if(now > prev){
+    const from = at(prev), to = at(now), dur = Math.min(2800, 800 + Math.abs(to - from) * 2.4);
+    const t0 = performance.now();
+    walker.classList.add('walking');
+    put(from);
+    const step = (t)=>{
+      const k = Math.min(1, (t - t0) / dur);
+      put(from + (to - from) * k);
+      if(k < 1) walkerAnim = requestAnimationFrame(step);
+      else { walkerAnim = null; walker.classList.remove('walking'); }
+    };
+    walkerAnim = requestAnimationFrame(step);
+  } else {
+    put(at(now));
+  }
 }
 
 /* ---------- courses list ---------- */
@@ -8039,6 +8285,7 @@ function renderCourseScreen(){
     if(c.mapId){
       urlFor(c.mapId).then(url=>{ const img = document.getElementById('courseMapImg'); if(img && url) img.setAttribute('href', url); });
     }
+    requestAnimationFrame(()=>placeWalker(c, list));
   } else {
     body.innerHTML = list.map(({h,i})=>{
       const locked = courseLocked(c, i), done = courseCovered(c, h);
@@ -8051,8 +8298,7 @@ function renderCourseScreen(){
   const play = (i)=>{
     if(courseLocked(c, i)){ toast('Finish the hymn before it first'); return; }
     const ids = (c.hymnIds||[]).filter(id=>hymns.some(h=>h.id===id));
-    loadHymnIntoPlayer(c.hymnIds[i], ids);
-    showScreen('player');
+    openCoursePlayer(c.hymnIds[i], ids);
   };
   body.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click', (e)=>{ e.stopPropagation(); play(+b.dataset.play); }));
   body.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>play(+b.dataset.open)));
@@ -8104,8 +8350,7 @@ document.getElementById('coursePlayNext').addEventListener('click', ()=>{
   const ids = (c.hymnIds||[]).filter(id=>hymns.some(h=>h.id===id));
   const nextId = ids.find(id=>!courseCovered(c, hymns.find(h=>h.id===id)));
   if(!nextId){ toast('Every hymn in this course is covered 🎉'); return; }
-  loadHymnIntoPlayer(nextId, ids);
-  showScreen('player');
+  openCoursePlayer(nextId, ids);
 });
 document.getElementById('courseLock').addEventListener('change', (e)=>{
   const c = courses.find(x=>x.id===openCourseId); if(!c) return;
